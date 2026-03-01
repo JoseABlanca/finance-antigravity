@@ -1054,7 +1054,7 @@ const QuantReport = () => {
                     <>
                         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: '24px' }}>
                             {/* Scatter Plot */}
-                            <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: '540px' }}>
+                            <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '400px' : '540px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                                     <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>Efficient Frontier (Monte Carlo)</h3>
                                     <select
@@ -1344,7 +1344,7 @@ const QuantReport = () => {
                         </div>
 
                         {kde3dData && (
-                            <div style={{ marginTop: '24px', background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: '850px' }}>
+                            <div style={{ marginTop: '24px', background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '500px' : '850px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                                     <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>Distribución de Portafolios (3D KDE)</h3>
                                     <div style={{ fontSize: '12px', color: '#666' }}>
@@ -1548,7 +1548,7 @@ const QuantReport = () => {
                             {mcData && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                                     {/* Paths Chart */}
-                                    <div style={{ height: '400px' }}>
+                                    <div style={{ height: isMobile ? '300px' : '400px' }}>
                                         <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '12px' }}>Simulated Return Paths ({mcData.paths.length} runs)</h3>
                                         <Line
                                             data={{
@@ -1597,7 +1597,7 @@ const QuantReport = () => {
                                         {/* Charts on the left */}
                                         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '24px' }}>
                                             {/* Distribution (PDF) */}
-                                            <div style={{ height: '450px' }}>
+                                            <div style={{ height: isMobile ? '300px' : '450px' }}>
                                                 <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '12px' }}>Terminal Value Distribution (KDE)</h3>
                                                 <Line
                                                     data={{
@@ -1711,7 +1711,7 @@ const QuantReport = () => {
                                             </div>
 
                                             {/* Cumulative Probability (CDF) */}
-                                            <div style={{ height: '450px' }}>
+                                            <div style={{ height: isMobile ? '300px' : '450px' }}>
                                                 <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '12px' }}>Cumulative Probability (CDF)</h3>
                                                 <Line
                                                     data={{
@@ -1844,7 +1844,7 @@ const QuantReport = () => {
                                         {/* Charts on the left */}
                                         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '24px' }}>
                                             {/* Max Drawdown Distribution (KDE) */}
-                                            <div style={{ height: '450px' }}>
+                                            <div style={{ height: isMobile ? '300px' : '450px' }}>
                                                 <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '12px' }}>Max Drawdown Distribution (KDE)</h3>
                                                 <Line
                                                     data={{
@@ -1957,7 +1957,7 @@ const QuantReport = () => {
                                             </div>
 
                                             {/* Cumulative Probability of Max Drawdown (CDF) */}
-                                            <div style={{ height: '450px' }}>
+                                            <div style={{ height: isMobile ? '300px' : '450px' }}>
                                                 <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '12px' }}>Cumulative Drawdown Probability (CDF)</h3>
                                                 <Line
                                                     data={{
@@ -2110,7 +2110,7 @@ const QuantReport = () => {
                             {/* LEFT COLUMN: CHARTS */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
                                 {/* Cumulative Returns - Normal Scale */}
-                                <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: '400px' }}>
+                                <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '300px' : '400px' }}>
                                     <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold' }}>Cumulative Returns vs Benchmark</h3>
                                     <div style={{ height: 'calc(100% - 40px)' }}>
                                         <Line
@@ -2164,7 +2164,7 @@ const QuantReport = () => {
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '24px' }}>
                                     {/* EOY Returns Chart */}
-                                    <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: '400px' }}>
+                                    <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '300px' : '400px' }}>
                                         <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold' }}>EOY Returns vs Benchmark</h3>
                                         <div style={{ height: 'calc(100% - 40px)' }}>
                                             <Bar
@@ -2270,7 +2270,7 @@ const QuantReport = () => {
                                     </div>
 
                                     {/* Daily Return Distribution */}
-                                    <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: '400px' }}>
+                                    <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '300px' : '400px' }}>
                                         <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold' }}>Daily Return Distribution (Gaussian)</h3>
                                         <div style={{ height: 'calc(100% - 40px)' }}>
                                             <Chart
@@ -2410,7 +2410,7 @@ const QuantReport = () => {
                                 </div>
 
                                 {/* Daily Active Returns */}
-                                <div style={{ background: 'white', padding: '24px', borderRadius: '12px', marginBottom: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: '400px' }}>
+                                <div style={{ background: 'white', padding: '24px', borderRadius: '12px', marginBottom: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '300px' : '400px' }}>
                                     <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold' }}>Daily Active Returns</h3>
                                     <div style={{ height: 'calc(100% - 40px)' }}>
                                         <Bar
@@ -2451,7 +2451,7 @@ const QuantReport = () => {
                                 </div>
 
                                 {/* Underwater Plot */}
-                                <div style={{ background: 'white', padding: '24px', borderRadius: '12px', marginBottom: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: '400px' }}>
+                                <div style={{ background: 'white', padding: '24px', borderRadius: '12px', marginBottom: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '300px' : '400px' }}>
                                     <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold' }}>Underwater Plot (Drawdowns)</h3>
                                     <div style={{ height: 'calc(100% - 40px)' }}>
                                         <Line
@@ -2559,7 +2559,7 @@ const QuantReport = () => {
                                 {data.rollingMetrics && data.rollingMetrics.length > 0 && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '24px' }}>
                                         {/* Rolling Beta */}
-                                        <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: '350px' }}>
+                                        <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '250px' : '350px' }}>
                                             <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold' }}>Rolling Beta (6M & 12M)</h3>
                                             <div style={{ height: 'calc(100% - 40px)' }}>
                                                 <Line
@@ -2625,7 +2625,7 @@ const QuantReport = () => {
                                         </div>
 
                                         {/* Rolling Volatility */}
-                                        <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: '350px' }}>
+                                        <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '250px' : '350px' }}>
                                             <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold' }}>Rolling Volatility (6-Months)</h3>
                                             <div style={{ height: 'calc(100% - 40px)' }}>
                                                 <Line
@@ -2690,7 +2690,7 @@ const QuantReport = () => {
                                         </div>
 
                                         {/* Rolling Sharpe */}
-                                        <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: '350px' }}>
+                                        <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '250px' : '350px' }}>
                                             <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold' }}>Rolling Sharpe (6-Months)</h3>
                                             <div style={{ height: 'calc(100% - 40px)' }}>
                                                 <Line
@@ -2747,7 +2747,7 @@ const QuantReport = () => {
                                         </div>
 
                                         {/* Rolling Sortino */}
-                                        <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: '350px' }}>
+                                        <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '250px' : '350px' }}>
                                             <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold' }}>Rolling Sortino (6-Months)</h3>
                                             <div style={{ height: 'calc(100% - 40px)' }}>
                                                 <Line
