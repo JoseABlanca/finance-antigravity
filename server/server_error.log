@@ -1,0 +1,207 @@
+
+[2026-02-04T14:26:09.889Z] Error analysing  :
+No data found, symbol may be delisted
+Error: No data found, symbol may be delisted
+    at YahooFinance.yahooFinanceFetch [as _fetch] (C:\Users\Jose\Desktop\Antigravity\server\node_modules\yahoo-finance2\script\src\lib\yahooFinanceFetch.js:125:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async YahooFinance.moduleExec [as _moduleExec] (C:\Users\Jose\Desktop\Antigravity\server\node_modules\yahoo-finance2\script\src\lib\moduleExec.js:121:18)
+    at async YahooFinance.chart (C:\Users\Jose\Desktop\Antigravity\server\node_modules\yahoo-finance2\script\src\modules\chart.js:169:21)
+    at async Promise.all (index 0)
+    at async exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:98:51)
+{}
+-------------------
+
+[2026-02-04T14:26:15.358Z] Error analysing " ":
+No data found, symbol may be delisted
+Error: No data found, symbol may be delisted
+    at YahooFinance.yahooFinanceFetch [as _fetch] (C:\Users\Jose\Desktop\Antigravity\server\node_modules\yahoo-finance2\script\src\lib\yahooFinanceFetch.js:125:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async YahooFinance.moduleExec [as _moduleExec] (C:\Users\Jose\Desktop\Antigravity\server\node_modules\yahoo-finance2\script\src\lib\moduleExec.js:121:18)
+    at async YahooFinance.chart (C:\Users\Jose\Desktop\Antigravity\server\node_modules\yahoo-finance2\script\src\modules\chart.js:169:21)
+    at async Promise.all (index 0)
+    at async exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:98:51)
+{}
+-------------------
+
+[2026-02-04T14:26:21.074Z] Error analysing SOFI:
+HTTP 404 Not Found
+Error: HTTP 404 Not Found
+    at YahooFinance.yahooFinanceFetch [as _fetch] (C:\Users\Jose\Desktop\Antigravity\server\node_modules\yahoo-finance2\script\src\lib\yahooFinanceFetch.js:125:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async YahooFinance.moduleExec [as _moduleExec] (C:\Users\Jose\Desktop\Antigravity\server\node_modules\yahoo-finance2\script\src\lib\moduleExec.js:121:18)
+    at async YahooFinance.chart (C:\Users\Jose\Desktop\Antigravity\server\node_modules\yahoo-finance2\script\src\modules\chart.js:169:21)
+    at async Promise.all (index 1)
+    at async exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:98:51)
+{}
+-------------------
+
+[2026-02-04T14:26:22.575Z] Error analysing SOFI:
+HTTP 404 Not Found
+Error: HTTP 404 Not Found
+    at YahooFinance.yahooFinanceFetch [as _fetch] (C:\Users\Jose\Desktop\Antigravity\server\node_modules\yahoo-finance2\script\src\lib\yahooFinanceFetch.js:125:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async YahooFinance.moduleExec [as _moduleExec] (C:\Users\Jose\Desktop\Antigravity\server\node_modules\yahoo-finance2\script\src\lib\moduleExec.js:121:18)
+    at async YahooFinance.chart (C:\Users\Jose\Desktop\Antigravity\server\node_modules\yahoo-finance2\script\src\modules\chart.js:169:21)
+    at async Promise.all (index 1)
+    at async exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:98:51)
+{}
+-------------------
+
+[2026-02-04T14:26:22.949Z] Error analysing SOFI:
+HTTP 404 Not Found
+Error: HTTP 404 Not Found
+    at YahooFinance.yahooFinanceFetch [as _fetch] (C:\Users\Jose\Desktop\Antigravity\server\node_modules\yahoo-finance2\script\src\lib\yahooFinanceFetch.js:125:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async YahooFinance.moduleExec [as _moduleExec] (C:\Users\Jose\Desktop\Antigravity\server\node_modules\yahoo-finance2\script\src\lib\moduleExec.js:121:18)
+    at async YahooFinance.chart (C:\Users\Jose\Desktop\Antigravity\server\node_modules\yahoo-finance2\script\src\modules\chart.js:169:21)
+    at async Promise.all (index 1)
+    at async exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:98:51)
+{}
+-------------------
+
+[2026-02-04T15:46:56.072Z] Error analysing SPY:
+eoyReturns is not defined
+ReferenceError: eoyReturns is not defined
+    at exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:444:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+{}
+-------------------
+
+[2026-02-04T15:46:56.100Z] Error analysing SPY:
+eoyReturns is not defined
+ReferenceError: eoyReturns is not defined
+    at exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:444:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+{}
+-------------------
+
+[2026-02-04T15:51:06.707Z] Error analysing SPY:
+eoyReturns is not defined
+ReferenceError: eoyReturns is not defined
+    at exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:444:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+{}
+-------------------
+
+[2026-02-04T15:51:06.743Z] Error analysing SPY:
+eoyReturns is not defined
+ReferenceError: eoyReturns is not defined
+    at exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:444:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+{}
+-------------------
+
+[2026-02-04T15:51:09.043Z] Error analysing AAPL:
+eoyReturns is not defined
+ReferenceError: eoyReturns is not defined
+    at exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:444:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+{}
+-------------------
+
+[2026-02-04T15:51:09.646Z] Error analysing AAPL:
+eoyReturns is not defined
+ReferenceError: eoyReturns is not defined
+    at exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:444:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+{}
+-------------------
+
+[2026-02-04T20:17:30.804Z] Error analysing SOFI:
+Cannot read properties of undefined (reading 'date')
+TypeError: Cannot read properties of undefined (reading 'date')
+    at calculateMetrics (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:411:63)
+    at exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:534:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+{}
+-------------------
+
+[2026-02-04T20:17:32.595Z] Error analysing SOFI:
+Cannot read properties of undefined (reading 'date')
+TypeError: Cannot read properties of undefined (reading 'date')
+    at calculateMetrics (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:411:63)
+    at exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:534:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+{}
+-------------------
+
+[2026-02-04T20:17:37.960Z] Error analysing SOFI:
+Cannot read properties of undefined (reading 'date')
+TypeError: Cannot read properties of undefined (reading 'date')
+    at calculateMetrics (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:411:63)
+    at exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:534:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+{}
+-------------------
+
+[2026-02-04T20:20:14.347Z] Error analysing AAPL:
+Cannot read properties of undefined (reading 'date')
+TypeError: Cannot read properties of undefined (reading 'date')
+    at calculateMetrics (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:411:63)
+    at exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:534:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+{}
+-------------------
+
+[2026-02-04T20:27:41.779Z] Error analysing AAPL:
+Cannot read properties of undefined (reading 'date')
+TypeError: Cannot read properties of undefined (reading 'date')
+    at calculateMetrics (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:411:63)
+    at exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:534:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+{}
+-------------------
+
+[2026-02-04T20:53:38.771Z] Error analysing AAPL:
+Cannot read properties of undefined (reading 'date')
+TypeError: Cannot read properties of undefined (reading 'date')
+    at calculateMetrics (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:411:63)
+    at exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:534:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+{}
+-------------------
+
+[2026-02-04T22:19:54.218Z] Error analysing SPY:
+benchReturnsForCalc is not defined
+ReferenceError: benchReturnsForCalc is not defined
+    at calculateMetrics (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:539:80)
+    at exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:631:26)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+{}
+-------------------
+
+[2026-02-04T22:19:54.251Z] Error analysing SPY:
+benchReturnsForCalc is not defined
+ReferenceError: benchReturnsForCalc is not defined
+    at calculateMetrics (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:539:80)
+    at exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:631:26)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+{}
+-------------------
+
+[2026-02-04T22:19:56.835Z] Error analysing AAPL:
+benchReturnsForCalc is not defined
+ReferenceError: benchReturnsForCalc is not defined
+    at calculateMetrics (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:539:80)
+    at exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:631:26)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+{}
+-------------------
+
+[2026-02-04T22:20:10.765Z] Error analysing AAPL:
+benchReturnsForCalc is not defined
+ReferenceError: benchReturnsForCalc is not defined
+    at calculateMetrics (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:539:80)
+    at exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:631:26)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+{}
+-------------------
+
+[2026-02-05T08:43:40.049Z] Error analysing AAPL:
+Cannot read properties of undefined (reading 'date')
+TypeError: Cannot read properties of undefined (reading 'date')
+    at calculateMetrics (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:464:63)
+    at exports.analyzeTicker (C:\Users\Jose\Desktop\Antigravity\server\controllers\investmentController.js:673:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+{}
+-------------------

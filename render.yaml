@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: antigravity-backend
+    env: node
+    region: frankfurt
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+    # Note: Render's Free tier uses an ephemeral filesystem.
+    # The SQLite database (finance.db) will be reset every time the server restarts.
+    # To make the database persistent, you need to add a Disk (requires a paid plan).
+    # disk:
+    #   name: data
+    #   mountPath: /opt/render/project/src/server
+    #   sizeGB: 1

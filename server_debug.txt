@@ -1,0 +1,328 @@
+[dotenv@17.2.3] injecting env (2) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+Initializing database tables...
+Database tables initialized.
+Server running on port 3001
+[DEBUG] analyzeTicker called for AAPL with query: [Object: null prototype] {}
+Analyzing: AAPL (USD) vs SPY (USD). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] analyzeTicker called for INVALIDTICKERTest with query: [Object: null prototype] {}
+Analyzing: INVALIDTICKERTest (USD) vs SPY (USD). Years: 5
+[DEBUG] Alignment Keys: benchmark. Total Dates: 1255
+[DEBUG] analyzeTicker called for PORTFOLIO with query: [Object: null prototype] {}
+Analyzing: PORTFOLIO (USD) vs SPY (USD). Years: 5
+Reconstructing Portfolio History...
+[DEBUG] analyzeTicker called for SPY with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  years: '5',
+  currency: 'USD',
+  benchmarkCurrency: 'USD'
+}
+Analyzing: SPY (USD) vs SPY (USD). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] analyzeTicker called for SPY with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770310975935',
+  years: '5'
+}
+Analyzing: SPY (USD) vs SPY (USD). Years: 5
+[DEBUG] analyzeTicker called for SPY with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770310975940',
+  years: '5'
+}
+Analyzing: SPY (USD) vs SPY (USD). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+[DEBUG] analyzeTicker called for SPY with query: [Object: null prototype] {
+  currency: 'EUR',
+  benchmark: 'SPY',
+  benchmarkCurrency: 'USD'
+}
+Analyzing: SPY (EUR) vs SPY (USD). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark, currency. Total Dates: 1453
+Analyzing Custom Portfolio: AAPL, MSFT, GOOGL, AMZN, NVDA
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Analyzing Custom Portfolio: AAPL, MSFT, GOOGL, AMZN, NVDA
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Analyzing Custom Portfolio: AAPL, MSFT, GOOGL, AMZN, NVDA
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Analyzing Custom Portfolio: AAPL, MSFT, GOOGL, AMZN, NVDA
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Analyzing Custom Portfolio: AAPL, MSFT, GOOGL, AMZN, NVDA
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Analyzing Custom Portfolio: AAPL, MSFT, GOOGL, AMZN, NVDA
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Analyzing Custom Portfolio: AAPL, MSFT, GOOGL, AMZN, NVDA
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Analyzing Custom Portfolio: AAPL, MSFT, GOOGL, AMZN, NVDA
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+[DEBUG] analyzeTicker called for AAPL with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770311197300',
+  years: '5'
+}
+Analyzing: AAPL (USD) vs SPY (USD). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Analyzing Custom Portfolio: AAPL, MSFT, GOOGL, AMZN, NVDA
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+[DEBUG] analyzeTicker called for SPY with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770333760906',
+  years: '5'
+}
+Analyzing: SPY (USD) vs SPY (USD). Years: 5
+[DEBUG] analyzeTicker called for SPY with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770333760907',
+  years: '5'
+}
+Analyzing: SPY (USD) vs SPY (USD). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] analyzeTicker called for AAPL with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770333788502',
+  years: '5'
+}
+Analyzing: AAPL (USD) vs SPY (USD). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] analyzeTicker called for SOFI with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770333813053',
+  years: '5'
+}
+Analyzing: SOFI (USD) vs SPY (USD). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] analyzeTicker called for SOFI with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770333821949',
+  years: '5'
+}
+Analyzing: SOFI (USD) vs SPY (USD). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] analyzeTicker called for SOFI with query: [Object: null prototype] {
+  benchmark: 'SOFI',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770333826949',
+  years: '5'
+}
+Analyzing: SOFI (USD) vs SOFI (USD). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] analyzeTicker called for SOFI with query: [Object: null prototype] {
+  benchmark: 'SOFI',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770333832429',
+  years: '5'
+}
+Analyzing: SOFI (USD) vs SOFI (USD). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] analyzeTicker called for SPY with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770362129150',
+  years: '5'
+}
+Analyzing: SPY (USD) vs SPY (USD). Years: 5
+[DEBUG] analyzeTicker called for SPY with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770362129151',
+  years: '5'
+}
+Analyzing: SPY (USD) vs SPY (USD). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] analyzeTicker called for AAPL with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770362133594',
+  years: '5'
+}
+Analyzing: AAPL (USD) vs SPY (USD). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] analyzeTicker called for SOFI with query: [Object: null prototype] {
+  benchmark: 'SOFI',
+  currency: 'USD',
+  benchmarkCurrency: 'EUR',
+  t: '1770362280289',
+  years: '5'
+}
+Analyzing: SOFI (USD) vs SOFI (EUR). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark, currency. Total Dates: 1453
+[DEBUG] analyzeTicker called for SPY with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770362297041',
+  years: '5'
+}
+Analyzing: SPY (USD) vs SPY (USD). Years: 5
+[DEBUG] analyzeTicker called for SPY with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770362297044',
+  years: '5'
+}
+Analyzing: SPY (USD) vs SPY (USD). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] analyzeTicker called for SOFI with query: [Object: null prototype] {
+  benchmark: 'SOFI',
+  currency: 'USD',
+  benchmarkCurrency: 'EUR',
+  t: '1770362330234',
+  years: '5'
+}
+Analyzing: SOFI (USD) vs SOFI (EUR). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark, currency. Total Dates: 1453
+[DEBUG] analyzeTicker called for SPY with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770362548760',
+  years: '5'
+}
+Analyzing: SPY (USD) vs SPY (USD). Years: 5
+[DEBUG] analyzeTicker called for SPY with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770362548761',
+  years: '5'
+}
+Analyzing: SPY (USD) vs SPY (USD). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] analyzeTicker called for SPY with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770362582813',
+  years: '5'
+}
+Analyzing: SPY (USD) vs SPY (USD). Years: 5
+[DEBUG] analyzeTicker called for SPY with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770362582826',
+  years: '5'
+}
+Analyzing: SPY (USD) vs SPY (USD). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] analyzeTicker called for SPY with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770362637527',
+  years: '5'
+}
+Analyzing: SPY (USD) vs SPY (USD). Years: 5
+[DEBUG] analyzeTicker called for SPY with query: [Object: null prototype] {
+  benchmark: 'SPY',
+  currency: 'USD',
+  benchmarkCurrency: 'USD',
+  t: '1770362637530',
+  years: '5'
+}
+Analyzing: SPY (USD) vs SPY (USD). Years: 5
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+[DEBUG] Alignment Keys: strategy, benchmark. Total Dates: 1255
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Optimizing portfolio for: AAPL, MSFT, GOOGL, AMZN, NVDA over 5 years
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.

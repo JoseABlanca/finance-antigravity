@@ -1,0 +1,108 @@
+[debug] [2026-03-01T18:37:46.342Z] ----------------------------------------------------------------------
+[debug] [2026-03-01T18:37:46.346Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Jose\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\bin\firebase.js login --no-localhost --reauth --interactive
+[debug] [2026-03-01T18:37:46.346Z] CLI Version:   15.8.0
+[debug] [2026-03-01T18:37:46.346Z] Platform:      win32
+[debug] [2026-03-01T18:37:46.346Z] Node Version:  v24.13.0
+[debug] [2026-03-01T18:37:46.346Z] Time:          Sun Mar 01 2026 19:37:46 GMT+0100 (Central European Standard Time)
+[debug] [2026-03-01T18:37:46.346Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-03-01T18:37:46.349Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2026-03-01T18:37:46.384Z] >>> [apiv2][query] POST https://auth.firebase.tools/attest [none]
+[debug] [2026-03-01T18:37:46.384Z] >>> [apiv2][body] POST https://auth.firebase.tools/attest {"session_id":"fb0b6f59-2937-4a60-8c38-9d184037acd1"}
+[debug] [2026-03-01T18:37:46.716Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2026-03-01T18:37:46.716Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2026-03-01T18:37:46.809Z] <<< [apiv2][status] POST https://auth.firebase.tools/attest 200
+[debug] [2026-03-01T18:37:46.809Z] <<< [apiv2][body] POST https://auth.firebase.tools/attest {"token":"NmHVowU0EWDrmS31EhbEcwDHBsfVCuz09jDJP7Mbi1A"}
+[info] 
+[info] To sign in to the Firebase CLI:
+[info] 
+[info] 1. Take note of your session ID:
+[info] 
+[info]    FB0B6
+[info] 
+[info] 2. Visit the URL below on any device and follow the instructions to get your code:
+[info] 
+[info]    https://auth.firebase.tools/login?code_challenge=Dq13H3zqC0c1W2HV_SKNEIIg8rmyzWk3YM_oyftJoj4&session=fb0b6f59-2937-4a60-8c38-9d184037acd1&attest=NmHVowU0EWDrmS31EhbEcwDHBsfVCuz09jDJP7Mbi1A
+[info] 
+[info] 3. Paste or enter the authorization code below once you have it:
+[info] 
+[debug] [2026-03-01T18:38:12.111Z] ExitPromptError: User force closed the prompt with SIGINT
+    at Interface.sigint (C:\Users\Jose\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\@inquirer\core\dist\commonjs\lib\create-prompt.js:101:37)
+    at Interface.emit (node:events:508:28)
+    at [_ttyWrite] [as _ttyWrite] (node:internal/readline/interface:1327:18)
+    at ReadStream.onkeypress (node:internal/readline/interface:284:20)
+    at ReadStream.emit (node:events:520:35)
+    at emitKeys (node:internal/readline/utils:371:14)
+    at emitKeys.next (<anonymous>)
+    at ReadStream.onData (node:internal/readline/emitKeypressEvents:64:36)
+    at ReadStream.emit (node:events:508:28)
+    at addChunk (node:internal/streams/readable:559:12)
+[error] 
+[error] Error: An unexpected error has occurred.
+[debug] [2026-03-01T18:43:34.275Z] ----------------------------------------------------------------------
+[debug] [2026-03-01T18:43:34.278Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Jose\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\bin\firebase.js projects:create -n Antigravity Finance antigravity-finance-0815
+[debug] [2026-03-01T18:43:34.278Z] CLI Version:   15.8.0
+[debug] [2026-03-01T18:43:34.278Z] Platform:      win32
+[debug] [2026-03-01T18:43:34.278Z] Node Version:  v24.13.0
+[debug] [2026-03-01T18:43:34.278Z] Time:          Sun Mar 01 2026 19:43:34 GMT+0100 (Central European Standard Time)
+[debug] [2026-03-01T18:43:34.278Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-03-01T18:43:34.285Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-03-01T18:43:34.285Z] > authorizing via signed-in user (j.a.blanca89@gmail.com)
+[debug] [2026-03-01T18:43:34.289Z] Checked if tokens are valid: true, expires at: 1772394177498
+[debug] [2026-03-01T18:43:34.289Z] Checked if tokens are valid: true, expires at: 1772394177498
+[debug] [2026-03-01T18:43:34.290Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects [none]
+[debug] [2026-03-01T18:43:34.290Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects {"projectId":"antigravity-finance-0815","name":"Antigravity Finance"}
+[debug] [2026-03-01T18:43:35.034Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects 409
+[debug] [2026-03-01T18:43:35.035Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects {"error":{"code":409,"message":"Requested entity already exists","status":"ALREADY_EXISTS"}}
+[debug] [2026-03-01T18:43:35.037Z] FirebaseError: Request to https://cloudresourcemanager.googleapis.com/v1/projects had HTTP Error: 409, Requested entity already exists
+    at responseToError (C:\Users\Jose\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\responseToError.js:53:12)
+    at RetryOperation._fn (C:\Users\Jose\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\apiv2.js:330:77)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[error] 
+[error] Error: Failed to create project because there is already a project with ID antigravity-finance-0815. Please try again with a unique project ID.
+[debug] [2026-03-01T18:43:45.866Z] ----------------------------------------------------------------------
+[debug] [2026-03-01T18:43:45.869Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Jose\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\bin\firebase.js projects:create -n Antigravity Finance antigravity-finance-030126
+[debug] [2026-03-01T18:43:45.869Z] CLI Version:   15.8.0
+[debug] [2026-03-01T18:43:45.870Z] Platform:      win32
+[debug] [2026-03-01T18:43:45.870Z] Node Version:  v24.13.0
+[debug] [2026-03-01T18:43:45.870Z] Time:          Sun Mar 01 2026 19:43:45 GMT+0100 (Central European Standard Time)
+[debug] [2026-03-01T18:43:45.870Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-03-01T18:43:45.876Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-03-01T18:43:45.877Z] > authorizing via signed-in user (j.a.blanca89@gmail.com)
+[debug] [2026-03-01T18:43:45.881Z] Checked if tokens are valid: true, expires at: 1772394177498
+[debug] [2026-03-01T18:43:45.881Z] Checked if tokens are valid: true, expires at: 1772394177498
+[debug] [2026-03-01T18:43:45.882Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects [none]
+[debug] [2026-03-01T18:43:45.882Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects {"projectId":"antigravity-finance-030126","name":"Antigravity Finance"}
+[debug] [2026-03-01T18:43:46.322Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects 200
+[debug] [2026-03-01T18:43:46.322Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects {"name":"operations/create_project.global.4880441406243928231"}
+[debug] [2026-03-01T18:43:46.323Z] Checked if tokens are valid: true, expires at: 1772394177498
+[debug] [2026-03-01T18:43:46.323Z] Checked if tokens are valid: true, expires at: 1772394177498
+[debug] [2026-03-01T18:43:46.323Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.4880441406243928231 [none]
+[debug] [2026-03-01T18:43:46.938Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.4880441406243928231 200
+[debug] [2026-03-01T18:43:46.938Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.4880441406243928231 {"name":"operations/create_project.global.4880441406243928231"}
+[debug] [2026-03-01T18:43:47.448Z] [Project Creation Poller] Retrying task index 0
+[debug] [2026-03-01T18:43:47.449Z] Checked if tokens are valid: true, expires at: 1772394177498
+[debug] [2026-03-01T18:43:47.449Z] Checked if tokens are valid: true, expires at: 1772394177498
+[debug] [2026-03-01T18:43:47.449Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.4880441406243928231 [none]
+[debug] [2026-03-01T18:43:47.621Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.4880441406243928231 200
+[debug] [2026-03-01T18:43:47.621Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.4880441406243928231 {"name":"operations/create_project.global.4880441406243928231"}
+[debug] [2026-03-01T18:43:48.625Z] [Project Creation Poller] Retrying task index 0
+[debug] [2026-03-01T18:43:48.625Z] Checked if tokens are valid: true, expires at: 1772394177498
+[debug] [2026-03-01T18:43:48.625Z] Checked if tokens are valid: true, expires at: 1772394177498
+[debug] [2026-03-01T18:43:48.625Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.4880441406243928231 [none]
+[debug] [2026-03-01T18:43:48.802Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.4880441406243928231 200
+[debug] [2026-03-01T18:43:48.802Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.4880441406243928231 {"name":"operations/create_project.global.4880441406243928231","metadata":{"@type":"type.googleapis.com/google.cloudresourcemanager.v1.ProjectCreationStatus","gettable":true,"ready":true},"done":true,"response":{"@type":"type.googleapis.com/google.cloudresourcemanager.v1.Project","projectNumber":"14106255327","projectId":"antigravity-finance-030126","lifecycleState":"ACTIVE","name":"Antigravity Finance","createTime":"2026-03-01T18:43:47.004734Z"}}
+[debug] [2026-03-01T18:43:48.803Z] Checked if tokens are valid: true, expires at: 1772394177498
+[debug] [2026-03-01T18:43:48.803Z] Checked if tokens are valid: true, expires at: 1772394177498
+[debug] [2026-03-01T18:43:48.803Z] >>> [apiv2][query] POST https://firebase.googleapis.com/v1beta1/projects/antigravity-finance-030126:addFirebase [none]
+[debug] [2026-03-01T18:43:50.021Z] <<< [apiv2][status] POST https://firebase.googleapis.com/v1beta1/projects/antigravity-finance-030126:addFirebase 403
+[debug] [2026-03-01T18:43:50.021Z] <<< [apiv2][body] POST https://firebase.googleapis.com/v1beta1/projects/antigravity-finance-030126:addFirebase {"error":{"code":403,"message":"The caller does not have permission","status":"PERMISSION_DENIED"}}
+[debug] [2026-03-01T18:43:50.022Z] Request to https://firebase.googleapis.com/v1beta1/projects/antigravity-finance-030126:addFirebase had HTTP Error: 403, The caller does not have permission
+[debug] [2026-03-01T18:43:50.023Z] FirebaseError: Request to https://firebase.googleapis.com/v1beta1/projects/antigravity-finance-030126:addFirebase had HTTP Error: 403, The caller does not have permission
+    at responseToError (C:\Users\Jose\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\responseToError.js:53:12)
+    at RetryOperation._fn (C:\Users\Jose\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\apiv2.js:330:77)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[error] 
+[error] Error: Failed to add Firebase to Google Cloud Platform project. See firebase-debug.log for more info.

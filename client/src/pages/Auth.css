@@ -1,0 +1,112 @@
+.auth-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background-color: var(--bg-app);
+    color: var(--text-main);
+    font-family: var(--font-family);
+}
+
+.auth-card {
+    background-color: var(--bg-card);
+    padding: 2.5rem;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-md);
+    width: 100%;
+    max-width: 400px;
+}
+
+.auth-title {
+    text-align: center;
+    margin-bottom: 24px;
+    font-size: 28px;
+    font-weight: 700;
+    color: #1a1b25;
+}
+
+.auth-error {
+    background-color: rgba(220, 38, 38, 0.1);
+    color: #ef4444;
+    padding: 0.75rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    font-size: 0.9rem;
+    border: 1px solid rgba(220, 38, 38, 0.2);
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group label {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.form-group input {
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    background-color: #ffffff;
+    color: var(--text-main);
+    font-size: 16px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.form-group input:focus {
+    border-color: var(--primary);
+}
+
+.auth-button {
+    background-color: var(--primary);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 12px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.auth-button:hover:not(:disabled) {
+    background-color: var(--primary-dark);
+}
+
+.auth-button:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+.auth-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.auth-links {
+    margin-top: 24px;
+    text-align: center;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.auth-links a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.auth-links a:hover {
+    text-decoration: underline;
+}
