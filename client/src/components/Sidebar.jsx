@@ -1,12 +1,19 @@
-import React, { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Wallet, TrendingUp, Settings, ChevronLeft, Menu, LogOut } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Wallet, TrendingUp, Settings, ChevronLeft, Menu, LogOut, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Sidebar = () => {
     const [isOpen, setIsOpen] = useState(true);
+    const [isMobileOpen, setIsMobileOpen] = useState(false);
     const { logout, currentUser } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // Close mobile sidebar on route change
+    useEffect(() => {
+        setIsMobileOpen(false);
+    }, [location]);
 
     async function handleLogout() {
         try {
@@ -17,76 +24,108 @@ const Sidebar = () => {
         }
     }
 
-    if (!currentUser) return null; // Don't show sidebar on login/register pages
+    if (!currentUser) return null;
 
     return (
-        <div className={`sidebar ${isOpen ? '' : 'collapsed'}`}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '40px', paddingLeft: isOpen ? '12px' : '0', width: '100%' }}>
-                {isOpen && <h2 style={{ color: 'var(--primary)', margin: 0, whiteSpace: 'nowrap' }}>Finance Control</h2>}
-                <button
-                    onClick={() => setIsOpen(!isOpen)}
-                    style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--text-main)',
-                        padding: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginLeft: isOpen ? 'auto' : '0',
-                        width: isOpen ? 'auto' : '100%'
-                    }}
-                >
-                    {isOpen ? <ChevronLeft size={24} /> : <Menu size={24} />}
-                </button>
-            </div>
+        <>
+            <button className="mobile-menu-btn" onClick={() => setIsMobileOpen(true)}>
+                <Menu size={24} />
+            </button>
 
-            <nav className="nav-menu">
-                <NavLink to="/" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Informe Financiero">
-                    <LayoutDashboard size={20} />
-                    {isOpen && <span>Informe Financiero</span>}
-                </NavLink>
-                <NavLink to="/accounts" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Mayor">
-                    <Wallet size={20} />
-                    {isOpen && <span>Mayor</span>}
-                </NavLink>
-                <NavLink to="/journal" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Diario">
-                    <Wallet size={20} />
-                    {isOpen && <span>Diario</span>}
-                </NavLink>
+            {isMobileOpen && (
+                <div className="mobile-overlay" onClick={() => setIsMobileOpen(false)}></div>
+            )}
 
-                <NavLink to="/investments" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Inversiones">
-                    <TrendingUp size={20} />
-                    {isOpen && <span>Inversiones</span>}
-                </NavLink>
+            <div className={`sidebar ${isOpen ? '' : 'collapsed'} ${isMobileOpen ? 'mobile-open' : ''}`}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '40px', paddingLeft: isOpen || isMobileOpen ? '12px' : '0', width: '100%' }}>
+                    {(isOpen || isMobileOpen) && <h2 style={{ color: 'var(--primary)', margin: 0, whiteSpace: 'nowrap' }}>Finance Control</h2>}
 
-                <NavLink to="/reports" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Reportes">
-                    <LayoutDashboard size={20} />
-                    {isOpen && <span>Reportes</span>}
-                </NavLink>
-
-                <NavLink to="/report-quant" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Reporte Quant">
-                    <TrendingUp size={20} />
-                    {isOpen && <span>Reporte Quant</span>}
-                </NavLink>
-                <div style={{ marginTop: 'auto' }}>
-                    <NavLink to="/settings" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Configuración">
-                        <Settings size={20} />
-                        {isOpen && <span>Configuración</span>}
-                    </NavLink>
+                    {/* Desktop Collapse Toggle */}
                     <button
-                        onClick={handleLogout}
-                        className="nav-item"
-                        title="Cerrar Sesión"
-                        style={{ background: 'transparent', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', color: 'var(--text-main)', marginTop: '8px' }}
+                        className="desktop-toggle"
+                        onClick={() => setIsOpen(!isOpen)}
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--text-main)',
+                            padding: '8px',
+                            display: window.innerWidth > 768 ? 'flex' : 'none',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginLeft: isOpen ? 'auto' : '0',
+                            width: isOpen ? 'auto' : '100%'
+                        }}
                     >
-                        <LogOut size={20} />
-                        {isOpen && <span>Cerrar Sesión</span>}
+                        {isOpen ? <ChevronLeft size={24} /> : <Menu size={24} />}
+                    </button>
+
+                    {/* Mobile Close Toggle */}
+                    <button
+                        className="mobile-close"
+                        onClick={() => setIsMobileOpen(false)}
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--text-main)',
+                            padding: '8px',
+                            display: window.innerWidth <= 768 && isMobileOpen ? 'flex' : 'none',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginLeft: 'auto'
+                        }}
+                    >
+                        <X size={24} />
                     </button>
                 </div>
-            </nav>
-        </div>
+
+                <nav className="nav-menu">
+                    <NavLink to="/" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Informe Financiero">
+                        <LayoutDashboard size={20} />
+                        {(isOpen || isMobileOpen) && <span>Informe Financiero</span>}
+                    </NavLink>
+                    <NavLink to="/accounts" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Mayor">
+                        <Wallet size={20} />
+                        {(isOpen || isMobileOpen) && <span>Mayor</span>}
+                    </NavLink>
+                    <NavLink to="/journal" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Diario">
+                        <Wallet size={20} />
+                        {(isOpen || isMobileOpen) && <span>Diario</span>}
+                    </NavLink>
+
+                    <NavLink to="/investments" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Inversiones">
+                        <TrendingUp size={20} />
+                        {(isOpen || isMobileOpen) && <span>Inversiones</span>}
+                    </NavLink>
+
+                    <NavLink to="/reports" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Reportes">
+                        <LayoutDashboard size={20} />
+                        {(isOpen || isMobileOpen) && <span>Reportes</span>}
+                    </NavLink>
+
+                    <NavLink to="/report-quant" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Reporte Quant">
+                        <TrendingUp size={20} />
+                        {(isOpen || isMobileOpen) && <span>Reporte Quant</span>}
+                    </NavLink>
+                    <div style={{ marginTop: 'auto' }}>
+                        <NavLink to="/settings" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Configuración">
+                            <Settings size={20} />
+                            {(isOpen || isMobileOpen) && <span>Configuración</span>}
+                        </NavLink>
+                        <button
+                            onClick={handleLogout}
+                            className="nav-item"
+                            title="Cerrar Sesión"
+                            style={{ background: 'transparent', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', color: 'var(--text-main)', marginTop: '8px' }}
+                        >
+                            <LogOut size={20} />
+                            {(isOpen || isMobileOpen) && <span>Cerrar Sesión</span>}
+                        </button>
+                    </div>
+                </nav>
+            </div>
+        </>
     );
 };
 
