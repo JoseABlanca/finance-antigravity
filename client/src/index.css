@@ -1,3 +1,7 @@
+* {
+  box-sizing: border-box;
+}
+
 :root {
   --primary: #5e6ad2;
   --primary-dark: #4a54a8;
@@ -213,7 +217,7 @@ h3 {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0, 0, 0, 0.5);
     z-index: 1000;
   }
 
@@ -250,7 +254,8 @@ h3 {
 
   .main-content {
     padding: 16px;
-    padding-top: 64px; /* Space for the hamburger button */
+    padding-top: 64px;
+    /* Space for the hamburger button */
   }
 
   .dashboard-grid {
@@ -261,5 +266,26 @@ h3 {
   .card {
     padding: 16px;
     margin-bottom: 16px;
+  }
+
+  /* Make all tables responsive by default */
+  table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    /* Prevent contents from wrapping and squishing */
+  }
+
+  /* Fix custom grid rows from specific pages or components */
+  .form-row,
+  .grid-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Make sure charts constraints are flexible */
+  canvas {
+    max-width: 100% !important;
   }
 }
