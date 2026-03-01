@@ -848,8 +848,21 @@ const QuantReport = () => {
     const benchmarkLabel = `${benchmark} (${benchmarkCurrency})`;
 
     return (
-        <div style={{ fontFamily: "'Inter', sans-serif", maxWidth: '1600px', margin: '0 auto', padding: '20px', background: '#f8f9fa', minHeight: '100vh' }}>
-            <div style={{ position: 'sticky', top: 0, zIndex: 100, background: '#f8f9fa', borderBottom: '2px solid #eee', paddingBottom: '20px', marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <div style={{ fontFamily: "'Inter', sans-serif", maxWidth: '1600px', margin: '0 auto', padding: isMobile ? '10px' : '20px', background: '#f8f9fa', minHeight: '100vh' }}>
+            <div style={{
+                position: isMobile ? 'static' : 'sticky',
+                top: 0,
+                zIndex: 100,
+                background: '#f8f9fa',
+                borderBottom: '2px solid #eee',
+                paddingBottom: '20px',
+                marginBottom: '30px',
+                display: 'flex',
+                flexDirection: isMobile ? 'column' : 'row',
+                alignItems: isMobile ? 'stretch' : 'center',
+                flexWrap: 'wrap',
+                gap: '16px'
+            }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div>
                         <h1 style={{ margin: 0, fontSize: '24px', color: '#111' }}>Reporte Cuantitativo de Inversión</h1>
@@ -882,7 +895,7 @@ const QuantReport = () => {
                     </div>
                 </div>
 
-                <form onSubmit={handleSearch} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'flex-end', height: '40px' }}>
+                <form onSubmit={handleSearch} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: isMobile ? 'stretch' : 'flex-end', flexDirection: isMobile ? 'column' : 'row' }}>
                     {mode === 'TICKER' && (
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
                             <input
