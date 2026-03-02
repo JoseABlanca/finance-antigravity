@@ -2458,10 +2458,17 @@ exports.getCorrelationMatrix = async (req, res) => {
 
 exports.getWalkforwardAnalysis = async (req, res) => {
     try {
-        const { tickers, weights, years = 5, rebalance = 'monthly', initialCapital = 10000, benchmark = 'SPY' } = req.body;
+        const {
+            tickers,
+            years = 5,
+            initialCapital = 10000,
+            benchmark = 'SPY',
+            isMonths = 24, // Lookback for optimization
+            oosMonths = 6  // Rebalance frequency
+        } = req.body;
 
-        if (!tickers || !weights || tickers.length !== weights.length) {
-            return res.status(400).json({ error: "Invalid tickers or weights." });
+        if (!tickers || !Array.isArray(tickers) || tickers.length < 2) {
+            return res.status(400).json({ error: "Invalid tickers for optimization." });
         }
 
         const yahooFinance = new YahooFinance();
@@ -2478,7 +2485,7 @@ exports.getWalkforwardAnalysis = async (req, res) => {
         const historyResults = await Promise.all(historyPromises);
 
         const priceMap = {};
-        const validDates = new Set();
+        const validDatesSet = new Set();
 
         historyResults.forEach((hist, i) => {
             const sym = allSymbols[i];
@@ -2486,65 +2493,166 @@ exports.getWalkforwardAnalysis = async (req, res) => {
                 const dateStr = day.date.toISOString().split('T')[0];
                 if (!priceMap[dateStr]) priceMap[dateStr] = {};
                 priceMap[dateStr][sym] = day.adjClose;
-                validDates.add(dateStr);
+                validDatesSet.add(dateStr);
             });
         });
 
-        const sortedDates = Array.from(validDates).sort();
-        const commonDates = sortedDates.filter(d => Object.keys(priceMap[d]).length === allSymbols.length);
+        const sortedDatesTotal = Array.from(validDatesSet).sort();
+        const commonDates = sortedDatesTotal.filter(d =>
+            tickers.every(t => priceMap[d][t] !== undefined) && priceMap[d][benchmark] !== undefined
+        );
 
-        if (commonDates.length === 0) return res.status(400).json({ error: "No overlapping data." });
+        if (commonDates.length < 60) return res.status(400).json({ error: "No overlapping data." });
 
-        let capital = initialCapital;
-        let benchCapital = initialCapital;
-        const equityCurve = [];
-        const benchCurve = [];
-        const dates = [];
+        // Helper to optimize weights for a given date range
+        const optimizeOnRange = (startDate, endDate) => {
+            const rangeDates = commonDates.filter(d => d >= startDate && d <= endDate);
+            if (rangeDates.length < 20) return null;
 
-        let shares = {};
-        tickers.forEach((t, i) => {
-            shares[t] = (capital * weights[i]) / priceMap[commonDates[0]][t];
-        });
-        let benchShares = benchCapital / priceMap[commonDates[0]][benchmark];
-
-        let currentPeriod = '';
-
-        for (let i = 0; i < commonDates.length; i++) {
-            const d = commonDates[i];
-            const px = priceMap[d];
-
-            let isRebalanceDay = false;
-
-            if (rebalance === 'monthly') {
-                const m = d.substring(0, 7);
-                if (currentPeriod !== '' && m !== currentPeriod) isRebalanceDay = true;
-                currentPeriod = m;
-            } else if (rebalance === 'annual') {
-                const y = d.substring(0, 4);
-                if (currentPeriod !== '' && y !== currentPeriod) isRebalanceDay = true;
-                currentPeriod = y;
-            } else if (rebalance === 'daily') {
-                isRebalanceDay = true;
+            const returns = [];
+            for (let i = 1; i < rangeDates.length; i++) {
+                const today = rangeDates[i];
+                const prev = rangeDates[i - 1];
+                const row = tickers.map(t => (priceMap[today][t] - priceMap[prev][t]) / priceMap[prev][t]);
+                returns.push(row);
             }
 
-            let portValue = 0;
-            tickers.forEach(t => portValue += shares[t] * px[t]);
-            const bVal = benchShares * px[benchmark];
+            const numSims = 2000; // Lower than full optimizer for speed in WF
+            const rfr = 0.04 / 252;
+            let bestSharpe = -Infinity;
+            let bestW = null;
 
-            if (isRebalanceDay) {
-                tickers.forEach((t, j) => {
-                    shares[t] = (portValue * weights[j]) / px[t];
-                });
+            for (let i = 0; i < numSims; i++) {
+                let w = tickers.map(() => Math.random());
+                const sum = w.reduce((a, b) => a + b, 0);
+                w = w.map(v => v / sum);
+
+                const portRet = returns.map(row => row.reduce((s, r, idx) => s + r * w[idx], 0));
+                const mean = portRet.reduce((a, b) => a + b, 0) / portRet.length;
+                const std = Math.sqrt(portRet.reduce((a, v) => a + Math.pow(v - mean, 2), 0) / portRet.length);
+                const sharpe = (mean - rfr) / (std || 0.001);
+
+                if (sharpe > bestSharpe) {
+                    bestSharpe = sharpe;
+                    bestW = w;
+                }
             }
-            equityCurve.push(portValue);
-            benchCurve.push(bVal);
-            dates.push(d);
+            return bestW;
+        };
+
+        // Helper to get Net Profit for a range with specific weights
+        const getPerformance = (startDate, endDate, weights, startCap) => {
+            const rangeDates = commonDates.filter(d => d >= startDate && d <= endDate);
+            if (rangeDates.length < 2) return { netProfit: 0, endCap: startCap, days: 0 };
+
+            let currentCap = startCap;
+            const shares = tickers.map((t, i) => (startCap * weights[i]) / priceMap[rangeDates[0]][t]);
+
+            for (let i = 1; i < rangeDates.length; i++) {
+                const d = rangeDates[i];
+                currentCap = tickers.reduce((sum, t, idx) => sum + shares[idx] * priceMap[d][t], 0);
+            }
+
+            return {
+                netProfit: currentCap - startCap,
+                endCap: currentCap,
+                days: rangeDates.length
+            };
+        };
+
+        const windows = [];
+        let suiteEquity = [initialCapital];
+        let benchEquity = [initialCapital];
+        let suiteDates = [commonDates[0]];
+
+        // Define Start and End indices
+        let currentIndex = 0;
+
+        // --- BUG FIX & ADJUSTMENT ---
+        // If isMonths is too large for the total data, we must cap it.
+        // Total data in months approx = commonDates.length / 21
+        const dataMonths = commonDates.length / 21;
+        let adjustedIsMonths = isMonths;
+        if (adjustedIsMonths >= dataMonths - 1) {
+            adjustedIsMonths = Math.floor(dataMonths * 0.5); // Use 50% for IS
+            if (adjustedIsMonths < 3) adjustedIsMonths = 3; // Minimum 3 months
         }
 
-        const stratRet = (equityCurve[equityCurve.length - 1] - initialCapital) / initialCapital;
-        const benchRet = (benchCurve[benchCurve.length - 1] - initialCapital) / initialCapital;
+        // Find first possible OOS start (must have adjustedIsMonths before it)
+        const firstOOSDate = new Date(commonDates[0]);
+        firstOOSDate.setMonth(firstOOSDate.getMonth() + adjustedIsMonths);
 
-        const maxDrawdown = (curve) => {
+        let oosStartIndex = commonDates.findIndex(d => d >= firstOOSDate.toISOString().split('T')[0]);
+        if (oosStartIndex === -1) oosStartIndex = Math.floor(commonDates.length / 2); // Fallback to middle
+        if (oosStartIndex >= commonDates.length - 10) oosStartIndex = commonDates.length - 11;
+
+        let currentCap = initialCapital;
+        let currentBenchCap = initialCapital;
+        const benchShares = initialCapital / priceMap[commonDates[oosStartIndex]][benchmark];
+
+        // --- STATIC COMPARISON CALCULATION ---
+        // Optimize once at the very start of the walkforward period
+        const firstISStart = commonDates[0];
+        const firstISEnd = commonDates[oosStartIndex - 1];
+        const staticWeights = optimizeOnRange(firstISStart, firstISEnd) || tickers.map(() => 1 / tickers.length);
+        let staticEquity = [initialCapital];
+        const staticShares = tickers.map((t, idx) => (initialCapital * staticWeights[idx]) / priceMap[commonDates[oosStartIndex]][t]);
+
+        while (oosStartIndex < commonDates.length - 1) {
+            const oosStart = commonDates[oosStartIndex];
+            let oosEndIndex = oosStartIndex + (oosMonths * 21); // Approx 21 trading days per month
+            if (oosEndIndex >= commonDates.length) oosEndIndex = commonDates.length - 1;
+            const oosEnd = commonDates[oosEndIndex];
+
+            // IS is the chunk BEFORE OOS
+            const isEndDate = commonDates[oosStartIndex - 1];
+            const isStartDateObj = new Date(isEndDate);
+            isStartDateObj.setMonth(isStartDateObj.getMonth() - adjustedIsMonths);
+            const isStart = isStartDateObj.toISOString().split('T')[0];
+
+            const weights = optimizeOnRange(isStart, isEndDate);
+            if (!weights) break;
+
+            const isPerf = getPerformance(isStart, isEndDate, weights, 10000);
+            const oosPerf = getPerformance(oosStart, oosEnd, weights, currentCap);
+
+            windows.push({
+                isPeriod: `${isStart} - ${isEndDate}`,
+                oosPeriod: `${oosStart} - ${oosEnd}`,
+                daysIS: isPerf.days,
+                daysOOS: oosPerf.days,
+                netProfitIS: isPerf.netProfit,
+                netProfitOOS: oosPerf.netProfit,
+                weights: Object.fromEntries(tickers.map((t, idx) => [t, weights[idx]]))
+            });
+
+            // Fill equity curve for this OOS segment
+            const shares = tickers.map((t, i) => (currentCap * weights[i]) / priceMap[oosStart][t]);
+            for (let i = oosStartIndex + 1; i <= oosEndIndex; i++) {
+                const d = commonDates[i];
+                // WF Strategy
+                const val = tickers.reduce((sum, t, idx) => sum + shares[idx] * priceMap[d][t], 0);
+                suiteEquity.push(val);
+                // Static Strategy
+                const sVal = tickers.reduce((sum, t, idx) => sum + staticShares[idx] * priceMap[d][t], 0);
+                staticEquity.push(sVal);
+                // Benchmark
+                benchEquity.push(benchShares * priceMap[d][benchmark]);
+                suiteDates.push(d);
+            }
+
+            currentCap = oosPerf.endCap;
+            oosStartIndex = oosEndIndex;
+            if (oosStartIndex >= commonDates.length - 1) break;
+        }
+
+        const stratRet = (currentCap - initialCapital) / initialCapital;
+        const finalStaticCap = staticEquity[staticEquity.length - 1];
+        const staticRet = (finalStaticCap - initialCapital) / initialCapital;
+        const finalBenchCap = benchShares * priceMap[commonDates[commonDates.length - 1]][benchmark];
+        const benchRet = (finalBenchCap - initialCapital) / initialCapital;
+
+        const getMaxDrawdown = (curve) => {
             let maxP = curve[0], maxDD = 0;
             curve.forEach(v => {
                 if (v > maxP) maxP = v;
@@ -2555,18 +2663,22 @@ exports.getWalkforwardAnalysis = async (req, res) => {
         };
 
         res.json({
-            dates,
-            portfolioEquity: equityCurve,
-            benchmarkEquity: benchCurve,
+            dates: suiteDates,
+            portfolioEquity: suiteEquity,
+            staticEquity: staticEquity,
+            benchmarkEquity: benchEquity,
+            windows,
             metrics: {
                 portfolioReturn: stratRet,
+                staticReturn: staticRet,
                 benchmarkReturn: benchRet,
-                portfolioMaxDrawdown: maxDrawdown(equityCurve),
-                benchmarkMaxDrawdown: maxDrawdown(benchCurve)
+                portfolioMaxDrawdown: getMaxDrawdown(suiteEquity),
+                benchmarkMaxDrawdown: getMaxDrawdown(benchEquity)
             }
         });
 
     } catch (err) {
+        console.error("Walkforward Error:", err);
         res.status(500).json({ error: "Walkforward failed", details: err.message });
     }
 };

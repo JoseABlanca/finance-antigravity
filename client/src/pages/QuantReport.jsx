@@ -61,6 +61,9 @@ const QuantReport = () => {
     const [correlationType, setCorrelationType] = useState('returns'); // returns, drawdowns
     const [walkforwardData, setWalkforwardData] = useState(null);
     const [walkforwardLoading, setWalkforwardLoading] = useState(false);
+    const [wfIsMonths, setWfIsMonths] = useState(24);
+    const [wfOosMonths, setWfOosMonths] = useState(6);
+    const [wfSource, setWfSource] = useState('optimizer'); // 'optimizer' or 'portfolio'
 
     // Monte Carlo State
     const [mcSimulations, setMcSimulations] = useState(100);
@@ -124,18 +127,24 @@ const QuantReport = () => {
         }
 
         // Fetch Walkforward
+        fetchWalkforward();
+    };
+
+    const fetchWalkforward = async () => {
         setWalkforwardLoading(true);
         try {
-            const bestWeightsObj = optRes?.data?.bestPortfolio?.weights || {};
-            console.log("[Walkforward] optRes:", optRes?.data?.bestPortfolio);
-            console.log("[Walkforward] weights:", bestWeightsObj);
-            const bestTickersList = Object.keys(bestWeightsObj);
-            const bestWeightsArr = Object.values(bestWeightsObj);
-            if (bestTickersList.length > 0) {
+            const tickersList = wfSource === 'portfolio'
+                ? portfolioAssets
+                : optTickers.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0);
+
+            if (tickersList.length >= 2) {
                 const resWf2 = await api.post('/investments/walkforward', {
-                    tickers: bestTickersList,
-                    weights: bestWeightsArr,
-                    years
+                    tickers: tickersList,
+                    years: years,
+                    isMonths: wfIsMonths,
+                    oosMonths: wfOosMonths,
+                    initialCapital: 10000,
+                    benchmark: benchmark
                 });
                 setWalkforwardData(resWf2.data);
             }
@@ -1647,21 +1656,21 @@ const QuantReport = () => {
                                                                 <td style={{ padding: '8px', borderBottom: '1px solid #eee', fontWeight: 'bold', textAlign: 'left' }}>{t1}</td>
                                                                 {correlationData.tickers.map((t2, j) => {
                                                                     const val = correlationData.matrix[i][j];
-                                                                    // Green (negative corr) → White (no corr) → Red (positive corr)
+                                                                    // Green (positive corr) → White (no corr) → Red (negative corr)
                                                                     let color, textColor;
                                                                     if (i === j) {
-                                                                        color = '#4caf50'; textColor = 'white'; // diagonal = perfect 1.0 = dark green
+                                                                        color = '#10b981'; textColor = 'white'; // diagonal = perfect 1.0 = dark green
                                                                     } else if (val > 0) {
                                                                         const intensity = Math.min(val, 1);
-                                                                        const r = Math.round(255);
-                                                                        const g = Math.round(255 - 180 * intensity);
+                                                                        const r = Math.round(255 - 180 * intensity);
+                                                                        const g = Math.round(255);
                                                                         const b = Math.round(255 - 180 * intensity);
                                                                         color = `rgb(${r},${g},${b})`;
                                                                         textColor = intensity > 0.5 ? 'white' : '#333';
                                                                     } else {
                                                                         const intensity = Math.min(Math.abs(val), 1);
-                                                                        const r = Math.round(255 - 180 * intensity);
-                                                                        const g = Math.round(255);
+                                                                        const r = Math.round(255);
+                                                                        const g = Math.round(255 - 180 * intensity);
                                                                         const b = Math.round(255 - 180 * intensity);
                                                                         color = `rgb(${r},${g},${b})`;
                                                                         textColor = intensity > 0.5 ? 'white' : '#333';
@@ -1681,86 +1690,239 @@ const QuantReport = () => {
                                     </div>
                                 )}
 
-                                {optTab === 'walkforward' && (
-                                    <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                                            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>Walkforward Analysis</h3>
+                                <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+                                        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>Walkforward Analysis</h3>
+
+                                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                <label style={{ fontSize: '11px', color: '#666' }}>Activos</label>
+                                                <select
+                                                    value={wfSource}
+                                                    onChange={(e) => setWfSource(e.target.value)}
+                                                    style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}
+                                                >
+                                                    <option value="optimizer">Optimizer Tickers</option>
+                                                    <option value="portfolio">Mi Portfolio</option>
+                                                </select>
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                <label style={{ fontSize: '11px', color: '#666' }}>Meses IS (Lookback)</label>
+                                                <input
+                                                    type="number"
+                                                    value={wfIsMonths}
+                                                    onChange={(e) => setWfIsMonths(parseInt(e.target.value))}
+                                                    style={{ width: '60px', padding: '6px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}
+                                                />
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                <label style={{ fontSize: '11px', color: '#666' }}>Meses OOS (Rebalanceo)</label>
+                                                <input
+                                                    type="number"
+                                                    value={wfOosMonths}
+                                                    onChange={(e) => setWfOosMonths(parseInt(e.target.value))}
+                                                    style={{ width: '60px', padding: '6px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={fetchWalkforward}
+                                                disabled={walkforwardLoading}
+                                                style={{ padding: '8px 16px', background: '#1e3a8a', color: 'white', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: '500', fontSize: '13px', alignSelf: 'flex-end' }}
+                                            >
+                                                {walkforwardLoading ? 'Calculando...' : 'Recalcular'}
+                                            </button>
                                         </div>
-                                        {walkforwardLoading ? <p>Cargando análisis walkforward...</p> : walkforwardData ? (
-                                            <div>
-                                                <p style={{ fontSize: '14px', color: '#666', marginBottom: '16px' }}>Simula una estrategia que se rebalancea periódicamente (rebalanceo mensual) usando los pesos de la optimización (Max Sharpe).</p>
-                                                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
-                                                    <div style={{ padding: '16px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' }}>
-                                                        <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>Retorno Total</div>
-                                                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: walkforwardData.metrics?.portfolioReturn >= 0 ? '#10b981' : '#ef4444' }}>
-                                                            {((walkforwardData.metrics?.portfolioReturn || 0) * 100).toFixed(2)}%
-                                                        </div>
-                                                    </div>
-                                                    <div style={{ padding: '16px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' }}>
-                                                        <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>Max Drawdown</div>
-                                                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ef4444' }}>
-                                                            {((walkforwardData.metrics?.portfolioMaxDrawdown || 0) * 100).toFixed(2)}%
-                                                        </div>
-                                                    </div>
-                                                    <div style={{ padding: '16px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' }}>
-                                                        <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>Benchmark Retorno</div>
-                                                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: walkforwardData.metrics?.benchmarkReturn >= 0 ? '#10b981' : '#ef4444' }}>
-                                                            {((walkforwardData.metrics?.benchmarkReturn || 0) * 100).toFixed(2)}%
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div style={{ height: isMobile ? '280px' : '380px', width: '100%' }}>
-                                                    <Line
-                                                        data={{
-                                                            labels: walkforwardData.dates || [],
-                                                            datasets: [
-                                                                {
-                                                                    label: 'Portfolio (Walkforward)',
-                                                                    data: walkforwardData.portfolioEquity || [],
-                                                                    borderColor: '#1e88e5',
-                                                                    backgroundColor: 'rgba(30, 136, 229, 0.1)',
-                                                                    fill: true,
-                                                                    borderWidth: 2,
-                                                                    pointRadius: 0
-                                                                },
-                                                                {
-                                                                    label: 'Benchmark',
-                                                                    data: walkforwardData.benchmarkEquity || [],
-                                                                    borderColor: '#fbbf24',
-                                                                    backgroundColor: 'transparent',
-                                                                    fill: false,
-                                                                    borderWidth: 2,
-                                                                    pointRadius: 0
-                                                                }
-                                                            ]
-                                                        }}
-                                                        options={{
-                                                            responsive: true,
-                                                            maintainAspectRatio: false,
-                                                            plugins: {
-                                                                legend: { display: true, position: 'top' },
-                                                                tooltip: { mode: 'index', intersect: false }
-                                                            },
-                                                            scales: {
-                                                                x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
-                                                                y: { grid: { color: '#f5f5f5' }, title: { display: true, text: 'Capital (€)' } }
-                                                            }
-                                                        }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div style={{ padding: '24px', background: '#f0f4ff', borderRadius: '10px', border: '1px solid #c7d7f8', color: '#334' }}>
-                                                <h4 style={{ margin: '0 0 10px 0', fontSize: '16px', color: '#1e3a8a' }}>⚠️ Sin datos de Walkforward</h4>
-                                                <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6' }}>
-                                                    El análisis Walkforward simula rebalanceos periódicos usando los pesos del portfolio óptimo (Max Sharpe).
-                                                    Para generar estos datos, primero debe ejecutar la optimización haciendo clic en el botón <strong>"Optimizar"</strong> del sidebar.
-                                                    Una vez completada la optimización, los datos de Walkforward se cargarán automáticamente.
-                                                </p>
-                                            </div>
-                                        )}
                                     </div>
-                                )}
+
+                                    {walkforwardLoading ? (
+                                        <div style={{ padding: '40px', textAlign: 'center' }}>
+                                            <div className="spinner" style={{ border: '3px solid #f3f3f3', borderTop: '3px solid #1e3a8a', borderRadius: '50%', width: '30px', height: '30px', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
+                                            <p>Ejecutando simulación walkforward con re-optimización periódica...</p>
+                                        </div>
+                                    ) : walkforwardData ? (
+                                        <div>
+                                            <p style={{ fontSize: '14px', color: '#666', marginBottom: '16px' }}>
+                                                Simulación de re-optimización periódica (Rolling Window). Cada {wfOosMonths} meses se optimiza el portfolio usando los {wfIsMonths} meses anteriores (In-Sample) y se aplica el resultado al periodo siguiente (Out-of-Sample).
+                                            </p>
+
+                                            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+                                                <div style={{ padding: '16px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' }}>
+                                                    <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>Retorno Walkforward</div>
+                                                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: walkforwardData.metrics?.portfolioReturn >= 0 ? '#10b981' : '#ef4444' }}>
+                                                        {((walkforwardData.metrics?.portfolioReturn || 0) * 100).toFixed(2)}%
+                                                    </div>
+                                                </div>
+                                                <div style={{ padding: '16px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' }}>
+                                                    <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>Cartera Estática</div>
+                                                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: walkforwardData.metrics?.staticReturn >= 0 ? '#10b981' : '#ef4444' }}>
+                                                        {((walkforwardData.metrics?.staticReturn || 0) * 100).toFixed(2)}%
+                                                    </div>
+                                                </div>
+                                                <div style={{ padding: '16px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' }}>
+                                                    <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>Benchmark (SPY)</div>
+                                                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: walkforwardData.metrics?.benchmarkReturn >= 0 ? '#10b981' : '#ef4444' }}>
+                                                        {((walkforwardData.metrics?.benchmarkReturn || 0) * 100).toFixed(2)}%
+                                                    </div>
+                                                </div>
+                                                <div style={{ padding: '16px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' }}>
+                                                    <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>Max DD (WF)</div>
+                                                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ef4444' }}>
+                                                        {((walkforwardData.metrics?.portfolioMaxDrawdown || 0) * 100).toFixed(2)}%
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ height: isMobile ? '280px' : '380px', width: '100%', marginBottom: '32px' }}>
+                                                <Line
+                                                    data={{
+                                                        labels: walkforwardData.dates || [],
+                                                        datasets: [
+                                                            {
+                                                                label: 'Equity Walkforward',
+                                                                data: walkforwardData.portfolioEquity || [],
+                                                                borderColor: '#1e88e5',
+                                                                backgroundColor: 'rgba(30, 136, 229, 0.1)',
+                                                                fill: true,
+                                                                borderWidth: 2,
+                                                                pointRadius: 0,
+                                                                tension: 0.1
+                                                            },
+                                                            {
+                                                                label: 'Cartera Estática',
+                                                                data: walkforwardData.staticEquity || [],
+                                                                borderColor: '#9333ea',
+                                                                backgroundColor: 'transparent',
+                                                                fill: false,
+                                                                borderWidth: 2,
+                                                                pointRadius: 0,
+                                                                tension: 0.1
+                                                            },
+                                                            {
+                                                                label: 'Benchmark (SPY)',
+                                                                data: walkforwardData.benchmarkEquity || [],
+                                                                borderColor: '#9ca3af',
+                                                                backgroundColor: 'transparent',
+                                                                fill: false,
+                                                                borderDash: [5, 5],
+                                                                borderWidth: 1.5,
+                                                                pointRadius: 0,
+                                                                tension: 0.1
+                                                            }
+                                                        ]
+                                                    }}
+                                                    options={{
+                                                        responsive: true,
+                                                        maintainAspectRatio: false,
+                                                        plugins: { legend: { display: true }, tooltip: { mode: 'index', intersect: false } },
+                                                        scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } }, y: { grid: { color: '#f5f5f5' } } }
+                                                    }}
+                                                />
+                                            </div>
+
+                                            <div style={{ marginBottom: '32px' }}>
+                                                <h4 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '16px' }}>Esquema de Periodos (Roll-Forward)</h4>
+                                                <div style={{ background: '#fdfdfd', border: '1px solid #eee', borderRadius: '8px', padding: '16px', overflowX: 'auto' }}>
+                                                    <div style={{ minWidth: '600px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                        {walkforwardData.windows?.map((w, idx) => {
+                                                            // Simple staircase rendering calculation
+                                                            const totalWin = walkforwardData.windows.length;
+                                                            const isWidth = 40; // percent
+                                                            const oosWidth = 10; // percent
+                                                            const stepShift = (100 - (isWidth + oosWidth)) / totalWin;
+                                                            const leftShift = idx * stepShift;
+
+                                                            return (
+                                                                <div key={idx} style={{ display: 'flex', height: '20px', position: 'relative', alignItems: 'center' }}>
+                                                                    <div style={{ fontSize: '10px', width: '30px', color: '#999' }}>W{idx + 1}</div>
+                                                                    <div style={{ flex: 1, height: '14px', position: 'relative', background: '#f5f5f5', borderRadius: '4px' }}>
+                                                                        <div style={{
+                                                                            position: 'absolute',
+                                                                            left: `${leftShift}%`,
+                                                                            width: `${isWidth}%`,
+                                                                            height: '100%',
+                                                                            background: '#3b82f6',
+                                                                            borderRadius: '4px 0 0 4px',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'center',
+                                                                            color: 'white',
+                                                                            fontSize: '8px',
+                                                                            fontWeight: 'bold'
+                                                                        }}>IS {idx + 1}</div>
+                                                                        <div style={{
+                                                                            position: 'absolute',
+                                                                            left: `${leftShift + isWidth}%`,
+                                                                            width: `${oosWidth}%`,
+                                                                            height: '100%',
+                                                                            background: '#10b981',
+                                                                            borderRadius: '0 4px 4px 0',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'center',
+                                                                            color: 'white',
+                                                                            fontSize: '8px',
+                                                                            fontWeight: 'bold'
+                                                                        }}>OOS</div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: '30px', marginTop: '8px', fontSize: '10px', color: '#999' }}>
+                                                            <span>Inicio Datos</span>
+                                                            <span>Tiempo →</span>
+                                                            <span>Hoy</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ overflowX: 'auto' }}>
+                                                <h4 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '12px' }}>Detalle de Ventanas</h4>
+                                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                                    <thead>
+                                                        <tr style={{ background: '#f8f9fa', color: '#666', borderBottom: '2px solid #eee' }}>
+                                                            <th style={{ padding: '12px', textAlign: 'left' }}>Periodo IS</th>
+                                                            <th style={{ padding: '12px', textAlign: 'left' }}>Periodo OOS</th>
+                                                            <th style={{ padding: '12px', textAlign: 'center' }}>Días IS</th>
+                                                            <th style={{ padding: '12px', textAlign: 'center' }}>Días OOS</th>
+                                                            <th style={{ padding: '12px', textAlign: 'right' }}>Beneficio IS</th>
+                                                            <th style={{ padding: '12px', textAlign: 'right' }}>Beneficio OOS</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {walkforwardData.windows?.map((w, idx) => (
+                                                            <tr key={idx} style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                                                <td style={{ padding: '10px' }}>{w.isPeriod}</td>
+                                                                <td style={{ padding: '10px', fontWeight: '500', color: '#1e3a8a' }}>{w.oosPeriod}</td>
+                                                                <td style={{ padding: '10px', textAlign: 'center' }}>{w.daysIS}</td>
+                                                                <td style={{ padding: '10px', textAlign: 'center' }}>{w.daysOOS}</td>
+                                                                <td style={{ padding: '10px', textAlign: 'right', color: w.netProfitIS >= 0 ? '#10b981' : '#ef4444' }}>
+                                                                    {w.netProfitIS.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                                                                </td>
+                                                                <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold', color: w.netProfitOOS >= 0 ? '#10b981' : '#ef4444' }}>
+                                                                    {w.netProfitOOS.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div style={{ padding: '40px', background: '#f0f4ff', borderRadius: '10px', border: '1px solid #c7d7f8', color: '#334', textAlign: 'center' }}>
+                                            <h4 style={{ margin: '0 0 10px 0', fontSize: '16px', color: '#1e3a8a' }}>⚠️ Configuración Walkforward</h4>
+                                            <p style={{ margin: '0 0 20px 0', fontSize: '14px', lineHeight: '1.6' }}>
+                                                Configure los activos y periodos IS/OOS arriba y pulse <strong>"Recalcular"</strong> para ejecutar la simulación.
+                                            </p>
+                                            <button
+                                                onClick={fetchWalkforward}
+                                                style={{ padding: '10px 24px', background: '#1e3a8a', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600' }}
+                                            >
+                                                Ejecutar Simulación con {wfSource === 'portfolio' ? 'Mi Portfolio' : 'Optimizer Tickers'}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </>
                         )
                     }
