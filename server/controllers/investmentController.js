@@ -190,11 +190,13 @@ const calculateWorstDrawdowns = (priceData) => {
 
     if (inDrawdown && ddStartPeak !== null && lowestPrice !== null) {
         const dd = (lowestPrice - ddStartPeak) / ddStartPeak;
+        const lastDate = isQuotes ? priceData[priceData.length - 1].date : priceData.length - 1;
+        const days = ddStartDate ? Math.floor((new Date(lastDate) - new Date(ddStartDate)) / (1000 * 60 * 60 * 24)) : 0;
         drawdowns.push({
             started: ddStartDate ? new Date(ddStartDate).toISOString().split('T')[0] : 'Start',
             recovered: '-',
             drawdown: (dd * 100).toFixed(2) + '%',
-            days: 0
+            days: days
         });
     }
 
@@ -343,6 +345,33 @@ const calculateMetrics = (data, name) => {
         else { currentWinStreak = 0; currentLossStreak = 0; }
     }
 
+    let maxConsecutiveWinMonths = 0, currentWinMonths = 0;
+    let maxConsecutiveLossMonths = 0, currentLossMonths = 0;
+    for (let r of monthlyRets) {
+        if (r.return > 0) { currentWinMonths++; currentLossMonths = 0; if (currentWinMonths > maxConsecutiveWinMonths) maxConsecutiveWinMonths = currentWinMonths; }
+        else if (r.return < 0) { currentLossMonths++; currentWinMonths = 0; if (currentLossMonths > maxConsecutiveLossMonths) maxConsecutiveLossMonths = currentLossMonths; }
+        else { currentWinMonths = 0; currentLossMonths = 0; }
+    }
+
+    const currentDrawdownDays = (currentDrawdown < 0 && drawdownStart !== null)
+        ? Math.floor((new Date(dates[dates.length - 1]) - new Date(dates[drawdownStart])) / (1000 * 60 * 60 * 24))
+        : 0;
+
+    const yearlyReturnsMap = {};
+    for (let i = 0; i < prices.length; i++) {
+        const year = new Date(dates[i]).getFullYear();
+        if (!yearlyReturnsMap[year]) yearlyReturnsMap[year] = { start: prices[i], end: prices[i] };
+        yearlyReturnsMap[year].end = prices[i];
+    }
+    const yearReturns = Object.keys(yearlyReturnsMap).sort().map(y => (yearlyReturnsMap[y].end - yearlyReturnsMap[y].start) / yearlyReturnsMap[y].start);
+    let maxConsecutiveWinYears = 0, currentWinYears = 0;
+    let maxConsecutiveLossYears = 0, currentLossYears = 0;
+    for (let r of yearReturns) {
+        if (r > 0) { currentWinYears++; currentLossYears = 0; if (currentWinYears > maxConsecutiveWinYears) maxConsecutiveWinYears = currentWinYears; }
+        else if (r < 0) { currentLossYears++; currentWinYears = 0; if (currentLossYears > maxConsecutiveLossYears) maxConsecutiveLossYears = currentLossYears; }
+        else { currentWinYears = 0; currentLossYears = 0; }
+    }
+
     return {
         prices, dailyReturns, dailyReturnsWithDates, drawdownHistory, cagr, volatility, sharpe, sortino, maxDrawdown, longestDDDays, avgDrawdown,
         avgDrawdownDays, winRate, payoffRatio, profitFactor, cumulativeReturns, worst5Drawdowns, avgWin,
@@ -351,7 +380,9 @@ const calculateMetrics = (data, name) => {
         expectedYearly: Math.pow(1 + meanReturn, 252) - 1, kelly: winRate - ((1 - winRate) / (payoffRatio || 1)),
         calmar, ulcerIndex, recoveryFactor, avgUpMonth, avgDownMonth, bestMonth, worstMonth,
         winDays: winRate, winMonths: monthlyRets.filter(r => r.return > 0).length / (monthlyRets.length || 1),
-        maxConsecutiveGainDays: maxWinStreak, maxConsecutiveLossDays: maxLossStreak, currentPrice: endPrice
+        maxConsecutiveGainDays: maxWinStreak, maxConsecutiveLossDays: maxLossStreak, currentPrice: endPrice,
+        currentDrawdown, currentDrawdownDays, maxConsecutiveWinMonths, maxConsecutiveLossMonths,
+        maxConsecutiveWinYears, maxConsecutiveLossYears
     };
 };
 
@@ -1510,6 +1541,8 @@ exports.analyzeTicker = async (req, res) => {
             { metric: "Sortino/√2", strategy: n(strategy.sortino / Math.sqrt(2)), benchmark: n(bench.sortino / Math.sqrt(2)) },
             { isHeader: true },
             { metric: "Max Drawdown", strategy: p(strategy.maxDrawdown), benchmark: p(bench.maxDrawdown) },
+            { metric: "Current Drawdown", strategy: p(strategy.currentDrawdown), benchmark: p(bench.currentDrawdown) },
+            { metric: "Current DD Days", strategy: strategy.currentDrawdownDays.toFixed(0), benchmark: bench.currentDrawdownDays.toFixed(0) },
             { metric: "Longest DD Days", strategy: strategy.longestDDDays.toFixed(0), benchmark: bench.longestDDDays.toFixed(0) },
             { metric: "Volatility (ann.)", strategy: p(strategy.volatility), benchmark: p(bench.volatility) },
             { metric: "R^2", strategy: n(strategy.rSquared), benchmark: n(bench.rSquared) },
@@ -1562,6 +1595,10 @@ exports.analyzeTicker = async (req, res) => {
             { metric: "Win Year %", strategy: p(strategy.winYears || 0), benchmark: p(bench.winYears || 0) },
             { metric: "Max Consec. Gain Days", strategy: strategy.maxConsecutiveGainDays.toFixed(0), benchmark: bench.maxConsecutiveGainDays.toFixed(0) },
             { metric: "Max Consec. Loss Days", strategy: strategy.maxConsecutiveLossDays.toFixed(0), benchmark: bench.maxConsecutiveLossDays.toFixed(0) },
+            { metric: "Cons. Win Months", strategy: strategy.maxConsecutiveWinMonths.toFixed(0), benchmark: bench.maxConsecutiveWinMonths.toFixed(0) },
+            { metric: "Cons. Loss Months", strategy: strategy.maxConsecutiveLossMonths.toFixed(0), benchmark: bench.maxConsecutiveLossMonths.toFixed(0) },
+            { metric: "Cons. Win Years", strategy: strategy.maxConsecutiveWinYears.toFixed(0), benchmark: bench.maxConsecutiveWinYears.toFixed(0) },
+            { metric: "Cons. Loss Years", strategy: strategy.maxConsecutiveLossYears.toFixed(0), benchmark: bench.maxConsecutiveLossYears.toFixed(0) },
             { metric: "Beta", strategy: n(strategy.beta || 0), benchmark: "-" },
             { metric: "Alpha", strategy: p(strategy.alpha || 0), benchmark: "-" }
         ];
@@ -1999,6 +2036,8 @@ exports.analyzeCustomPortfolio = async (req, res) => {
             { metric: "Sortino/√2", strategy: n(strategy.sortino / Math.sqrt(2)), benchmark: n(bench.sortino / Math.sqrt(2)) },
             { isHeader: true },
             { metric: "Max Drawdown", strategy: p(strategy.maxDrawdown), benchmark: p(bench.maxDrawdown) },
+            { metric: "Current Drawdown", strategy: p(strategy.currentDrawdown), benchmark: p(bench.currentDrawdown) },
+            { metric: "Current DD Days", strategy: strategy.currentDrawdownDays.toFixed(0), benchmark: bench.currentDrawdownDays.toFixed(0) },
             { metric: "Longest DD Days", strategy: strategy.longestDDDays.toFixed(0), benchmark: bench.longestDDDays.toFixed(0) },
             { metric: "Volatility (ann.)", strategy: p(strategy.volatility), benchmark: p(bench.volatility) },
             { metric: "R^2", strategy: n(strategy.rSquared), benchmark: n(bench.rSquared) },
@@ -2051,6 +2090,10 @@ exports.analyzeCustomPortfolio = async (req, res) => {
             { metric: "Win Year %", strategy: p(strategy.winYears || 0), benchmark: p(bench.winYears || 0) },
             { metric: "Max Consec. Gain Days", strategy: (strategy.maxConsecutiveGainDays || 0).toFixed(0), benchmark: (bench.maxConsecutiveGainDays || 0).toFixed(0) },
             { metric: "Max Consec. Loss Days", strategy: (strategy.maxConsecutiveLossDays || 0).toFixed(0), benchmark: (bench.maxConsecutiveLossDays || 0).toFixed(0) },
+            { metric: "Cons. Win Months", strategy: (strategy.maxConsecutiveWinMonths || 0).toFixed(0), benchmark: (bench.maxConsecutiveWinMonths || 0).toFixed(0) },
+            { metric: "Cons. Loss Months", strategy: (strategy.maxConsecutiveLossMonths || 0).toFixed(0), benchmark: (bench.maxConsecutiveLossMonths || 0).toFixed(0) },
+            { metric: "Cons. Win Years", strategy: (strategy.maxConsecutiveWinYears || 0).toFixed(0), benchmark: (bench.maxConsecutiveWinYears || 0).toFixed(0) },
+            { metric: "Cons. Loss Years", strategy: (strategy.maxConsecutiveLossYears || 0).toFixed(0), benchmark: (bench.maxConsecutiveLossYears || 0).toFixed(0) },
             { metric: "Beta", strategy: n(strategy.beta || 0), benchmark: "-" },
             { metric: "Alpha", strategy: p(strategy.alpha || 0), benchmark: "-" }
         ];
@@ -2274,5 +2317,252 @@ exports.getFinancials = async (req, res) => {
     } catch (err) {
         console.error("Error in getFinancials:", err);
         res.status(500).json({ error: "Failed to fetch financial data", details: err.message });
+    }
+};
+
+exports.getCorrelationMatrix = async (req, res) => {
+    try {
+        const { tickers, period = 'monthly', type = 'returns', years = 5 } = req.body;
+        if (!tickers || !Array.isArray(tickers) || tickers.length < 2) {
+            return res.status(400).json({ error: "Please provide at least 2 tickers." });
+        }
+
+        const yahooFinance = new YahooFinance();
+        const end = new Date();
+        const start = new Date();
+        start.setFullYear(end.getFullYear() - parseInt(years));
+        const period1 = start.toISOString().split('T')[0];
+        const period2 = end.toISOString().split('T')[0];
+
+        const historyPromises = tickers.map(async t => {
+            return await yahooFinance.historical(t, { period1, period2, interval: '1d' });
+        });
+        const historyResults = await Promise.all(historyPromises);
+
+        const priceMap = {};
+        const validDates = new Set();
+
+        historyResults.forEach((hist, i) => {
+            const sym = tickers[i];
+            hist.forEach(day => {
+                const dateStr = day.date.toISOString().split('T')[0];
+                if (!priceMap[dateStr]) priceMap[dateStr] = {};
+                priceMap[dateStr][sym] = day.adjClose;
+                validDates.add(dateStr);
+            });
+        });
+
+        const sortedDates = Array.from(validDates).sort();
+        let groupedDates = [];
+
+        if (period === 'daily') {
+            groupedDates = sortedDates;
+        } else if (period === 'monthly') {
+            let currentMonth = '';
+            let lastDay = '';
+            sortedDates.forEach(d => {
+                const m = d.substring(0, 7);
+                if (m !== currentMonth) {
+                    if (lastDay) groupedDates.push(lastDay);
+                    currentMonth = m;
+                }
+                lastDay = d;
+            });
+            if (lastDay) groupedDates.push(lastDay);
+        } else if (period === 'annual') {
+            let currentYear = '';
+            let lastDay = '';
+            sortedDates.forEach(d => {
+                const y = d.substring(0, 4);
+                if (y !== currentYear) {
+                    if (lastDay) groupedDates.push(lastDay);
+                    currentYear = y;
+                }
+                lastDay = d;
+            });
+            if (lastDay) groupedDates.push(lastDay);
+        }
+
+        const commonGrouped = groupedDates.filter(d => Object.keys(priceMap[d]).length === tickers.length);
+
+        if (commonGrouped.length < 2) {
+            return res.status(400).json({ error: "Not enough overlapping data periods for these tickers." });
+        }
+
+        const metrics = {};
+        tickers.forEach(t => metrics[t] = []);
+
+        if (type === 'drawdowns') {
+            tickers.forEach(sym => {
+                let peak = priceMap[commonGrouped[0]][sym];
+                for (let i = 1; i < commonGrouped.length; i++) {
+                    const price = priceMap[commonGrouped[i]][sym];
+                    if (price > peak) peak = price;
+                    const dd = (price - peak) / peak;
+                    metrics[sym].push(dd);
+                }
+            });
+        } else {
+            for (let i = 1; i < commonGrouped.length; i++) {
+                const today = commonGrouped[i];
+                const prev = commonGrouped[i - 1];
+                tickers.forEach(sym => {
+                    const p1 = priceMap[today][sym];
+                    const p0 = priceMap[prev][sym];
+                    metrics[sym].push((p1 - p0) / p0);
+                });
+            }
+        }
+
+        const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+        const pearsonCol = (arrX, arrY) => {
+            const mx = mean(arrX), my = mean(arrY);
+            let num = 0, denX = 0, denY = 0;
+            for (let i = 0; i < arrX.length; i++) {
+                const dx = arrX[i] - mx, dy = arrY[i] - my;
+                num += dx * dy;
+                denX += dx * dx;
+                denY += dy * dy;
+            }
+            if (denX === 0 || denY === 0) return 0;
+            return num / Math.sqrt(denX * denY);
+        };
+
+        const matrix = [];
+        for (let i = 0; i < tickers.length; i++) {
+            const row = [];
+            for (let j = 0; j < tickers.length; j++) {
+                if (i === j) row.push(1);
+                else {
+                    row.push(pearsonCol(metrics[tickers[i]], metrics[tickers[j]]));
+                }
+            }
+            matrix.push(row);
+        }
+
+        res.json({
+            tickers,
+            period,
+            matrix,
+            dataPoints: commonGrouped.length - 1
+        });
+
+    } catch (err) {
+        res.status(500).json({ error: "Failed to calculate correlation", details: err.message });
+    }
+};
+
+exports.getWalkforwardAnalysis = async (req, res) => {
+    try {
+        const { tickers, weights, years = 5, rebalance = 'monthly', initialCapital = 10000, benchmark = 'SPY' } = req.body;
+
+        if (!tickers || !weights || tickers.length !== weights.length) {
+            return res.status(400).json({ error: "Invalid tickers or weights." });
+        }
+
+        const yahooFinance = new YahooFinance();
+        const end = new Date();
+        const start = new Date();
+        start.setFullYear(end.getFullYear() - parseInt(years));
+        const period1 = start.toISOString().split('T')[0];
+        const period2 = end.toISOString().split('T')[0];
+
+        const allSymbols = [...new Set([...tickers, benchmark])];
+        const historyPromises = allSymbols.map(async t => {
+            return await yahooFinance.historical(t, { period1, period2, interval: '1d' }).catch(() => []);
+        });
+        const historyResults = await Promise.all(historyPromises);
+
+        const priceMap = {};
+        const validDates = new Set();
+
+        historyResults.forEach((hist, i) => {
+            const sym = allSymbols[i];
+            hist.forEach(day => {
+                const dateStr = day.date.toISOString().split('T')[0];
+                if (!priceMap[dateStr]) priceMap[dateStr] = {};
+                priceMap[dateStr][sym] = day.adjClose;
+                validDates.add(dateStr);
+            });
+        });
+
+        const sortedDates = Array.from(validDates).sort();
+        const commonDates = sortedDates.filter(d => Object.keys(priceMap[d]).length === allSymbols.length);
+
+        if (commonDates.length === 0) return res.status(400).json({ error: "No overlapping data." });
+
+        let capital = initialCapital;
+        let benchCapital = initialCapital;
+        const equityCurve = [];
+        const benchCurve = [];
+        const dates = [];
+
+        let shares = {};
+        tickers.forEach((t, i) => {
+            shares[t] = (capital * weights[i]) / priceMap[commonDates[0]][t];
+        });
+        let benchShares = benchCapital / priceMap[commonDates[0]][benchmark];
+
+        let currentPeriod = '';
+
+        for (let i = 0; i < commonDates.length; i++) {
+            const d = commonDates[i];
+            const px = priceMap[d];
+
+            let isRebalanceDay = false;
+
+            if (rebalance === 'monthly') {
+                const m = d.substring(0, 7);
+                if (currentPeriod !== '' && m !== currentPeriod) isRebalanceDay = true;
+                currentPeriod = m;
+            } else if (rebalance === 'annual') {
+                const y = d.substring(0, 4);
+                if (currentPeriod !== '' && y !== currentPeriod) isRebalanceDay = true;
+                currentPeriod = y;
+            } else if (rebalance === 'daily') {
+                isRebalanceDay = true;
+            }
+
+            let portValue = 0;
+            tickers.forEach(t => portValue += shares[t] * px[t]);
+            const bVal = benchShares * px[benchmark];
+
+            if (isRebalanceDay) {
+                tickers.forEach((t, j) => {
+                    shares[t] = (portValue * weights[j]) / px[t];
+                });
+            }
+            equityCurve.push(portValue);
+            benchCurve.push(bVal);
+            dates.push(d);
+        }
+
+        const stratRet = (equityCurve[equityCurve.length - 1] - initialCapital) / initialCapital;
+        const benchRet = (benchCurve[benchCurve.length - 1] - initialCapital) / initialCapital;
+
+        const maxDrawdown = (curve) => {
+            let maxP = curve[0], maxDD = 0;
+            curve.forEach(v => {
+                if (v > maxP) maxP = v;
+                const dd = (v - maxP) / maxP;
+                if (dd < maxDD) maxDD = dd;
+            });
+            return maxDD;
+        };
+
+        res.json({
+            dates,
+            portfolioEquity: equityCurve,
+            benchmarkEquity: benchCurve,
+            metrics: {
+                portfolioReturn: stratRet,
+                benchmarkReturn: benchRet,
+                portfolioMaxDrawdown: maxDrawdown(equityCurve),
+                benchmarkMaxDrawdown: maxDrawdown(benchCurve)
+            }
+        });
+
+    } catch (err) {
+        res.status(500).json({ error: "Walkforward failed", details: err.message });
     }
 };

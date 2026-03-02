@@ -37,7 +37,7 @@ const Sidebar = () => {
             )}
 
             <div className={`sidebar ${isOpen ? '' : 'collapsed'} ${isMobileOpen ? 'mobile-open' : ''}`}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '40px', paddingLeft: isOpen || isMobileOpen ? '12px' : '0', width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '40px', paddingLeft: isOpen || isMobileOpen ? '12px' : '0', width: '100%' }}>
                     {(isOpen || isMobileOpen) && <h2 style={{ color: 'var(--primary)', margin: 0, whiteSpace: 'nowrap' }}>Finance Control</h2>}
 
                     {/* Desktop Collapse Toggle */}
@@ -99,9 +99,9 @@ const Sidebar = () => {
                         {(isOpen || isMobileOpen) && <span>Inversiones</span>}
                     </NavLink>
 
-                    <NavLink to="/reports" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Reportes">
+                    <NavLink to="/reports" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Reporte Financiero">
                         <LayoutDashboard size={20} />
-                        {(isOpen || isMobileOpen) && <span>Reportes</span>}
+                        {(isOpen || isMobileOpen) && <span>Reporte Financiero</span>}
                     </NavLink>
 
                     <NavLink to="/report-quant" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Reporte Quant">

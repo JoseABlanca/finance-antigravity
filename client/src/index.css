@@ -40,8 +40,8 @@ body {
 
 .sidebar {
   width: var(--nav-width);
-  background: white;
-  border-right: 1px solid #eaeaea;
+  background: #1a1b25;
+  border-right: 1px solid #2d2e3d;
   display: flex;
   flex-direction: column;
   padding: 24px;
@@ -156,8 +156,8 @@ h3 {
 
 .nav-item:hover,
 .nav-item.active {
-  background: rgba(94, 106, 210, 0.1);
-  color: var(--primary);
+  background: rgba(94, 106, 210, 0.15);
+  color: white;
   font-weight: 600;
 }
 

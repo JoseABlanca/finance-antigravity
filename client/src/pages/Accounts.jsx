@@ -89,6 +89,13 @@ const Accounts = () => {
     const navigate = useNavigate();
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
     const [showForm, setShowForm] = useState(false);
     const [newAccount, setNewAccount] = useState({ name: '', code: '', type: 'ASSET', parent_id: null, initialBalance: '', balance: '' });
 
@@ -290,48 +297,72 @@ const Accounts = () => {
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <h1>Plan de Cuentas</h1>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        <div style={{ position: 'relative' }}>
-                            <Search size={16} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
-                            <input
-                                type="text"
-                                placeholder="Buscar..."
-                                value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
-                                style={{
-                                    padding: '6px 8px 6px 30px',
-                                    borderRadius: '4px',
-                                    border: '1px solid #ddd',
-                                    fontSize: '13px',
-                                    width: '150px'
-                                }}
-                            />
+            <div style={{
+                display: 'flex',
+                flexDirection: isMobile ? 'column' : 'row',
+                justifyContent: isMobile ? 'center' : 'space-between',
+                alignItems: 'center',
+                marginBottom: '24px',
+                gap: isMobile ? '16px' : '0',
+                textAlign: isMobile ? 'center' : 'left'
+            }}>
+                <div style={{
+                    display: 'flex',
+                    flexDirection: isMobile ? 'column' : 'row',
+                    alignItems: 'center',
+                    gap: isMobile ? '12px' : '16px',
+                    width: isMobile ? '100%' : 'auto'
+                }}>
+                    <h1 style={{ margin: 0, fontSize: isMobile ? '1.8rem' : '2rem' }}>Plan de Cuentas</h1>
+                    <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        justifyContent: isMobile ? 'center' : 'flex-start',
+                        gap: '8px',
+                        width: isMobile ? '100%' : 'auto'
+                    }}>
+                        <div style={{ display: 'flex', gap: '8px', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'center' : 'flex-start' }}>
+                            <div style={{ position: 'relative' }}>
+                                <Search size={16} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar..."
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                    style={{
+                                        padding: '6px 8px 6px 30px',
+                                        borderRadius: '4px',
+                                        border: '1px solid #ddd',
+                                        fontSize: '13px',
+                                        width: isMobile ? '120px' : '150px'
+                                    }}
+                                />
+                            </div>
+                            <div style={{ position: 'relative' }}>
+                                <ArrowUpDown size={16} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
+                                <select
+                                    value={sortOrder}
+                                    onChange={e => setSortOrder(e.target.value)}
+                                    style={{
+                                        padding: '6px 8px 6px 30px',
+                                        borderRadius: '4px',
+                                        border: '1px solid #ddd',
+                                        fontSize: '13px',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <option value="code">Código</option>
+                                    <option value="name">Nombre</option>
+                                </select>
+                            </div>
                         </div>
-                        <div style={{ position: 'relative' }}>
-                            <ArrowUpDown size={16} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
-                            <select
-                                value={sortOrder}
-                                onChange={e => setSortOrder(e.target.value)}
-                                style={{
-                                    padding: '6px 8px 6px 30px',
-                                    borderRadius: '4px',
-                                    border: '1px solid #ddd',
-                                    fontSize: '13px',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                <option value="code">Código</option>
-                                <option value="name">Nombre</option>
-                            </select>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: isMobile ? 'center' : 'flex-start', width: isMobile ? '100%' : 'auto' }}>
+                            <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '12px', flex: isMobile ? 1 : 'none' }} onClick={expandAll}>Expandir Todo</button>
+                            <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '12px', flex: isMobile ? 1 : 'none' }} onClick={collapseAll}>Contraer Todo</button>
                         </div>
-                        <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={expandAll}>Expandir Todo</button>
-                        <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={collapseAll}>Contraer Todo</button>
                     </div>
                 </div>
-                <button className="btn" onClick={() => openAddModal(null)}>+ Nueva Cuenta Raíz</button>
+                <button className="btn" onClick={() => openAddModal(null)} style={{ width: isMobile ? '100%' : 'auto' }}>+ Nueva Cuenta Raíz</button>
             </div>
 
             <div className="card">

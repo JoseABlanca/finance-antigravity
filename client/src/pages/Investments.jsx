@@ -285,9 +285,9 @@ const Investments = () => {
 
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '32px' }}>
                 <h1>Inversiones</h1>
-                <button className="btn" onClick={() => { setEditingTrade(null); resetForm(); setShowTradeForm(true); }}>+ Registrar Operación</button>
+                <button className="btn" style={{ marginTop: '16px' }} onClick={() => { setEditingTrade(null); resetForm(); setShowTradeForm(true); }}>+ Registrar Operación</button>
             </div>
 
             {/* Tabs */}
@@ -314,7 +314,7 @@ const Investments = () => {
 
             {activeTab === 'dashboard' && (
                 <>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '24px' }}>
                         <select
                             value={selectedTicker}
                             onChange={e => setSelectedTicker(e.target.value)}
@@ -341,23 +341,23 @@ const Investments = () => {
                     <div className="dashboard-grid" style={{ marginBottom: '32px', display: 'block' }}>
                         {/* Metrics Cards */}
                         {dashboardSummary && (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', marginBottom: '32px' }}>
-                                <div className="card" style={{ padding: '24px' }}>
-                                    <p style={{ margin: '0 0 8px 0', color: '#64748b', fontSize: '0.9rem' }}>Total Invertido (Costo)</p>
-                                    <p style={{ margin: 0, fontSize: '1.8rem', fontWeight: 'bold', color: '#333' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+                                <div className="card" style={{ padding: '20px' }}>
+                                    <p style={{ margin: '0 0 8px 0', color: '#64748b', fontSize: '0.85rem' }}>Total Invertido</p>
+                                    <p style={{ margin: 0, fontSize: '1.4rem', fontWeight: 'bold', color: '#333' }}>
                                         {formatCurrency(dashboardSummary.summary.invested)}
                                     </p>
                                 </div>
-                                <div className="card" style={{ padding: '24px' }}>
-                                    <p style={{ margin: '0 0 8px 0', color: '#64748b', fontSize: '0.9rem' }}>Valor Actual</p>
-                                    <p style={{ margin: 0, fontSize: '1.8rem', fontWeight: 'bold', color: '#333' }}>
+                                <div className="card" style={{ padding: '20px' }}>
+                                    <p style={{ margin: '0 0 8px 0', color: '#64748b', fontSize: '0.85rem' }}>Valor Actual</p>
+                                    <p style={{ margin: 0, fontSize: '1.4rem', fontWeight: 'bold', color: '#333' }}>
                                         {formatCurrency(dashboardSummary.summary.currentValue)}
                                     </p>
                                 </div>
-                                <div className="card" style={{ padding: '24px' }}>
-                                    <p style={{ margin: '0 0 8px 0', color: '#64748b', fontSize: '0.9rem' }}>Ganancia / Pérdida</p>
+                                <div className="card" style={{ padding: '20px' }}>
+                                    <p style={{ margin: '0 0 8px 0', color: '#64748b', fontSize: '0.85rem' }}>Ganancia / Pérdida</p>
                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                        <p style={{ margin: 0, fontSize: '1.8rem', fontWeight: 'bold', color: dashboardSummary.summary.pl >= 0 ? '#10b981' : '#ef4444' }}>
+                                        <p style={{ margin: 0, fontSize: '1.4rem', fontWeight: 'bold', color: dashboardSummary.summary.pl >= 0 ? '#10b981' : '#ef4444' }}>
                                             {dashboardSummary.summary.pl >= 0 ? '+' : ''}{formatCurrency(dashboardSummary.summary.pl)}
                                         </p>
                                         <span style={{
@@ -504,7 +504,7 @@ const Investments = () => {
                         </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '32px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px', marginBottom: '32px' }}>
                         {/* Daily Returns Chart */}
                         <div className="card" style={{ padding: '24px' }}>
                             <h3 style={{ marginBottom: '20px' }}>Rendimientos Diarios (%)</h3>
@@ -896,10 +896,12 @@ const Investments = () => {
                 
                 .modal-overlay {
                     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-                    background: rgba(15, 23, 42, 0.75);
-                    backdrop-filter: blur(4px);
-                    display: flex; justify-content: center; align-items: center;
+                    background: rgba(15, 23, 42, 0.8);
+                    backdrop-filter: blur(8px);
+                    display: flex; justify-content: center; align-items: flex-start; 
+                    padding: 40px 20px;
                     z-index: 1000;
+                    overflow-y: auto;
                     animation: fadeIn 0.2s ease-out;
                 }
 
@@ -910,13 +912,13 @@ const Investments = () => {
 
                 .premium-modal {
                     width: 540px;
-                    max-width: 95%;
-                    border-radius: 20px;
-                    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-                    overflow: hidden;
-                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    max-width: 100%;
                     background: white;
+                    border-radius: 24px;
+                    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
                     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+                    margin-bottom: 40px;
                 }
 
                 @keyframes slideUp {

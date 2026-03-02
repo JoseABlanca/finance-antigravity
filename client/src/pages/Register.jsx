@@ -34,27 +34,32 @@ export default function Register() {
     return (
         <div className="auth-container">
             <div className="auth-card">
-                <h2 className="auth-title">Sign Up</h2>
-                {error && <div className="auth-error">{error}</div>}
-                <form onSubmit={handleSubmit} className="auth-form">
-                    <div className="form-group">
-                        <label>Email</label>
-                        <input type="email" ref={emailRef} required />
+                <div className="auth-header">
+                    <h1 style={{ color: 'white', margin: '10px 0 0 0', fontSize: '1.5rem' }}>Finance Control</h1>
+                </div>
+                <div className="auth-body">
+                    <h2 className="auth-title">Sign Up</h2>
+                    {error && <div className="auth-error">{error}</div>}
+                    <form onSubmit={handleSubmit} className="auth-form">
+                        <div className="form-group">
+                            <label>Email</label>
+                            <input type="email" ref={emailRef} required />
+                        </div>
+                        <div className="form-group">
+                            <label>Password</label>
+                            <input type="password" ref={passwordRef} required />
+                        </div>
+                        <div className="form-group">
+                            <label>Password Confirmation</label>
+                            <input type="password" ref={passwordConfirmRef} required />
+                        </div>
+                        <button disabled={loading} className="auth-button" type="submit">
+                            Sign Up
+                        </button>
+                    </form>
+                    <div className="auth-links">
+                        Already have an account? <Link to="/login">Log In</Link>
                     </div>
-                    <div className="form-group">
-                        <label>Password</label>
-                        <input type="password" ref={passwordRef} required />
-                    </div>
-                    <div className="form-group">
-                        <label>Password Confirmation</label>
-                        <input type="password" ref={passwordConfirmRef} required />
-                    </div>
-                    <button disabled={loading} className="auth-button" type="submit">
-                        Sign Up
-                    </button>
-                </form>
-                <div className="auth-links">
-                    Already have an account? <Link to="/login">Log In</Link>
                 </div>
             </div>
         </div>

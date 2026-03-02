@@ -11,6 +11,13 @@ const FinanceDashboard = () => {
     const [trends, setTrends] = useState([]);
     const [summary, setSummary] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -68,13 +75,25 @@ const FinanceDashboard = () => {
             </div>
 
             {/* Data Table (Below Chart as requested in Photo 2) */}
-            <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+            <div style={{ overflowX: isMobile ? 'hidden' : 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: isMobile ? '11px' : '14px' }}>
                     <thead>
                         <tr style={{ borderBottom: '1px solid #eee' }}>
-                            <th style={{ textAlign: 'left', padding: '12px 16px', color: '#666', fontWeight: '500', width: '250px' }}>Período</th>
+                            <th style={{
+                                textAlign: 'left',
+                                padding: isMobile ? '8px 4px' : '12px 16px',
+                                color: '#666',
+                                fontWeight: '500',
+                                width: isMobile ? '100px' : '250px',
+                                whiteSpace: 'normal'
+                            }}>Período</th>
                             {tableData.map((d, i) => (
-                                <th key={i} style={{ textAlign: 'right', padding: '12px 16px', color: '#666', fontWeight: '500' }}>{d.period}</th>
+                                <th key={i} style={{
+                                    textAlign: 'right',
+                                    padding: isMobile ? '8px 4px' : '12px 16px',
+                                    color: '#666',
+                                    fontWeight: '500'
+                                }}>{d.period}</th>
                             ))}
                         </tr>
                     </thead>
@@ -82,21 +101,21 @@ const FinanceDashboard = () => {
                         {type === 'pnl' ? (
                             <>
                                 <tr style={{ borderBottom: '1px solid #f9f9f9' }}>
-                                    <td style={{ padding: '12px 16px', color: '#888' }}>Ingresos totales</td>
-                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: '12px 16px' }}>{formatCurrency(d.revenue)}</td>)}
+                                    <td style={{ padding: isMobile ? '8px 4px' : '12px 16px', color: '#888', whiteSpace: 'normal' }}>Ingresos totales</td>
+                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: isMobile ? '8px 4px' : '12px 16px' }}>{formatCurrency(d.revenue)}</td>)}
                                 </tr>
                                 <tr style={{ borderBottom: '1px solid #f9f9f9' }}>
-                                    <td style={{ padding: '12px 16px', color: '#888' }}>Beneficio bruto</td>
-                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: '12px 16px' }}>{formatCurrency(d.gross_profit || 0)}</td>)}
+                                    <td style={{ padding: isMobile ? '8px 4px' : '12px 16px', color: '#888', whiteSpace: 'normal' }}>Beneficio bruto</td>
+                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: isMobile ? '8px 4px' : '12px 16px' }}>{formatCurrency(d.gross_profit || 0)}</td>)}
                                 </tr>
                                 <tr style={{ borderBottom: '1px solid #f9f9f9' }}>
-                                    <td style={{ padding: '12px 16px', color: '#888' }}>Resultado de explotación</td>
-                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: '12px 16px' }}>{formatCurrency(d.operating_result || 0)}</td>)}
+                                    <td style={{ padding: isMobile ? '8px 4px' : '12px 16px', color: '#888', whiteSpace: 'normal' }}>Resultado de explotación</td>
+                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: isMobile ? '8px 4px' : '12px 16px' }}>{formatCurrency(d.operating_result || 0)}</td>)}
                                 </tr>
                                 <tr>
-                                    <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>Resultado atribuido al grupo</td>
+                                    <td style={{ padding: isMobile ? '8px 4px' : '12px 16px', fontWeight: 'bold', whiteSpace: 'normal' }}>Resultado atribuido al grupo</td>
                                     {tableData.map((d, i) => (
-                                        <td key={i} style={{ textAlign: 'right', padding: '12px 16px', fontWeight: 'bold' }}>
+                                        <td key={i} style={{ textAlign: 'right', padding: isMobile ? '8px 4px' : '12px 16px', fontWeight: 'bold' }}>
                                             {formatCurrency(d.net_result)}
                                         </td>
                                     ))}
@@ -105,39 +124,39 @@ const FinanceDashboard = () => {
                         ) : type === 'balance' ? (
                             <>
                                 <tr style={{ borderBottom: '1px solid #f9f9f9' }}>
-                                    <td style={{ padding: '12px 16px', color: '#888' }}>Activos</td>
-                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: '12px 16px' }}>{formatCurrency(d.total_assets || 0)}</td>)}
+                                    <td style={{ padding: isMobile ? '8px 4px' : '12px 16px', color: '#888', whiteSpace: 'normal' }}>Activos</td>
+                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: isMobile ? '8px 4px' : '12px 16px' }}>{formatCurrency(d.total_assets || 0)}</td>)}
                                 </tr>
                                 <tr style={{ borderBottom: '1px solid #f9f9f9' }}>
-                                    <td style={{ padding: '12px 16px', color: '#888' }}>Pasivos</td>
-                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: '12px 16px' }}>{formatCurrency(d.total_liabilities || 0)}</td>)}
+                                    <td style={{ padding: isMobile ? '8px 4px' : '12px 16px', color: '#888', whiteSpace: 'normal' }}>Pasivos</td>
+                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: isMobile ? '8px 4px' : '12px 16px' }}>{formatCurrency(d.total_liabilities || 0)}</td>)}
                                 </tr>
                                 <tr>
-                                    <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>Patrimonio Neto</td>
-                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: '12px 16px', fontWeight: 'bold' }}>{formatCurrency(d.total_equity || 0)}</td>)}
+                                    <td style={{ padding: isMobile ? '8px 4px' : '12px 16px', fontWeight: 'bold', whiteSpace: 'normal' }}>Patrimonio Neto</td>
+                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: isMobile ? '8px 4px' : '12px 16px', fontWeight: 'bold' }}>{formatCurrency(d.total_equity || 0)}</td>)}
                                 </tr>
                             </>
                         ) : (
                             <>
                                 <tr style={{ borderBottom: '1px solid #f9f9f9' }}>
-                                    <td style={{ padding: '12px 16px', color: '#888' }}>Flujos de actividades de explotación</td>
-                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: '12px 16px' }}>{formatCurrency(d.op_cf || 0)}</td>)}
+                                    <td style={{ padding: isMobile ? '8px 4px' : '12px 16px', color: '#888', whiteSpace: 'normal' }}>Flujos de actividades de explotación</td>
+                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: isMobile ? '8px 4px' : '12px 16px' }}>{formatCurrency(d.op_cf || 0)}</td>)}
                                 </tr>
                                 <tr style={{ borderBottom: '1px solid #f9f9f9' }}>
-                                    <td style={{ padding: '12px 16px', color: '#888' }}>Flujos de actividades de inversión</td>
-                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: '12px 16px' }}>{formatCurrency(d.inv_cf || 0)}</td>)}
+                                    <td style={{ padding: isMobile ? '8px 4px' : '12px 16px', color: '#888', whiteSpace: 'normal' }}>Flujos de actividades de inversión</td>
+                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: isMobile ? '8px 4px' : '12px 16px' }}>{formatCurrency(d.inv_cf || 0)}</td>)}
                                 </tr>
                                 <tr style={{ borderBottom: '1px solid #f9f9f9' }}>
-                                    <td style={{ padding: '12px 16px', color: '#888' }}>Flujos de actividades de financiación</td>
-                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: '12px 16px' }}>{formatCurrency(d.fin_cf || 0)}</td>)}
+                                    <td style={{ padding: isMobile ? '8px 4px' : '12px 16px', color: '#888', whiteSpace: 'normal' }}>Flujos de actividades de financiación</td>
+                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: isMobile ? '8px 4px' : '12px 16px' }}>{formatCurrency(d.fin_cf || 0)}</td>)}
                                 </tr>
                                 <tr style={{ borderBottom: '1px solid #f9f9f9' }}>
-                                    <td style={{ padding: '12px 16px', color: '#6366f1', fontWeight: '500' }}>Free Cash Flow</td>
-                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: '12px 16px', color: '#6366f1', fontWeight: '500' }}>{formatCurrency(d.fcf || 0)}</td>)}
+                                    <td style={{ padding: isMobile ? '8px 4px' : '12px 16px', color: '#6366f1', fontWeight: '500', whiteSpace: 'normal' }}>Free Cash Flow</td>
+                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: isMobile ? '8px 4px' : '12px 16px', color: '#6366f1', fontWeight: '500' }}>{formatCurrency(d.fcf || 0)}</td>)}
                                 </tr>
                                 <tr>
-                                    <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>Flujo Neto</td>
-                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: '12px 16px', fontWeight: 'bold', color: d.net_result >= 0 ? '#10b981' : '#ef4444' }}>{formatCurrency(d.net_result)}</td>)}
+                                    <td style={{ padding: isMobile ? '8px 4px' : '12px 16px', fontWeight: 'bold', whiteSpace: 'normal' }}>Flujo Neto</td>
+                                    {tableData.map((d, i) => <td key={i} style={{ textAlign: 'right', padding: isMobile ? '8px 4px' : '12px 16px', fontWeight: 'bold', color: d.net_result >= 0 ? '#10b981' : '#ef4444' }}>{formatCurrency(d.net_result)}</td>)}
                                 </tr>
                             </>
                         )}
@@ -175,14 +194,27 @@ const FinanceDashboard = () => {
     };
 
     return (
-        <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
+        <div style={{ maxWidth: '1100px', margin: '0 auto', padding: isMobile ? '16px' : '20px' }}>
+            <div style={{
+                display: 'flex',
+                flexDirection: isMobile ? 'column' : 'row',
+                justifyContent: isMobile ? 'center' : 'space-between',
+                alignItems: 'center',
+                marginBottom: '40px',
+                textAlign: isMobile ? 'center' : 'left',
+                gap: isMobile ? '24px' : '0'
+            }}>
                 <div>
-                    <h1 style={{ fontSize: '2.2rem', marginBottom: '8px' }}>Informe Financiero</h1>
-                    <p style={{ color: '#666', margin: 0 }}>Tendencias históricas y desglose de resultados.</p>
+                    <h1 style={{ fontSize: isMobile ? '1.8rem' : '2.2rem', marginBottom: '8px' }}>Informe Financiero</h1>
                 </div>
 
-                <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '12px' }}>
+                <div style={{
+                    display: 'flex',
+                    background: '#f1f5f9',
+                    padding: '4px',
+                    borderRadius: '12px',
+                    width: isMobile ? 'fit-content' : 'auto'
+                }}>
                     <button
                         onClick={() => setTrendType('QUARTERLY')}
                         style={{

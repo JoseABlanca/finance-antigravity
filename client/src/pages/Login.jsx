@@ -29,26 +29,31 @@ export default function Login() {
     return (
         <div className="auth-container">
             <div className="auth-card">
-                <h2 className="auth-title">Log In</h2>
-                {error && <div className="auth-error">{error}</div>}
-                <form onSubmit={handleSubmit} className="auth-form">
-                    <div className="form-group">
-                        <label>Email</label>
-                        <input type="email" ref={emailRef} required />
-                    </div>
-                    <div className="form-group">
-                        <label>Password</label>
-                        <input type="password" ref={passwordRef} required />
-                    </div>
-                    <button disabled={loading} className="auth-button" type="submit">
-                        Log In
-                    </button>
-                </form>
-                <div className="auth-links">
-                    <Link to="/forgot-password">Forgot Password?</Link>
+                <div className="auth-header">
+                    <h1 style={{ color: 'white', margin: '10px 0 0 0', fontSize: '1.5rem' }}>Finance Control</h1>
                 </div>
-                <div className="auth-links">
-                    Need an account? <Link to="/register">Sign Up</Link>
+                <div className="auth-body">
+                    <h2 className="auth-title">Log In</h2>
+                    {error && <div className="auth-error">{error}</div>}
+                    <form onSubmit={handleSubmit} className="auth-form">
+                        <div className="form-group">
+                            <label>Email</label>
+                            <input type="email" ref={emailRef} required />
+                        </div>
+                        <div className="form-group">
+                            <label>Password</label>
+                            <input type="password" ref={passwordRef} required />
+                        </div>
+                        <button disabled={loading} className="auth-button" type="submit">
+                            Log In
+                        </button>
+                    </form>
+                    <div className="auth-links">
+                        <Link to="/forgot-password">Forgot Password?</Link>
+                    </div>
+                    <div className="auth-links">
+                        Need an account? <Link to="/register">Sign Up</Link>
+                    </div>
                 </div>
             </div>
         </div>

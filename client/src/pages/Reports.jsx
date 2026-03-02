@@ -259,13 +259,10 @@ const Reports = () => {
 
     return (
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-                <div>
-                    <h1>Libros Contables</h1>
-                    <p style={{ color: '#666', margin: 0 }}>Consulta el estado oficial de tus finanzas por ejercicio y trimestre.</p>
-                </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '32px', gap: '20px' }}>
+                <h1 style={{ margin: 0 }}>Reporte Financiero</h1>
 
-                <div style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
                     <div style={{ display: 'flex', background: '#eee', padding: '4px', borderRadius: '10px' }}>
                         {[
                             { id: 'ANNUAL', label: 'Anual' },
@@ -297,7 +294,7 @@ const Reports = () => {
                 </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 {[
                     { id: 'balance', label: 'Balance de Situación', icon: <FileText size={18} /> },
                     { id: 'pnl', label: 'P&L (Resultados)', icon: <ArrowRightLeft size={18} /> },
@@ -336,7 +333,7 @@ const Reports = () => {
                                 letterSpacing: '2px',
                                 textTransform: 'uppercase'
                             }}>
-                                {activeTab === 'balance' ? 'BALANCE DE LA SITUACIÓN' :
+                                {activeTab === 'balance' ? 'BALANCE DE SITUACIÓN' :
                                     activeTab === 'pnl' ? 'CUENTA DE RESULTADOS' :
                                         'FLUJOS DE EFECTIVO'}
                             </h1>

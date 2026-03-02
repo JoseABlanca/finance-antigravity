@@ -18,6 +18,8 @@ router.delete('/investments/trade/:id', investmentController.deleteTrade);
 router.get('/investments/portfolio', investmentController.getPortfolio);
 router.post('/investments/optimize', investmentController.optimizePortfolio);
 router.post('/investments/analyze/custom', investmentController.analyzeCustomPortfolio);
+router.post('/investments/correlation', investmentController.getCorrelationMatrix); // NEW ROUTE
+router.post('/investments/walkforward', investmentController.getWalkforwardAnalysis); // NEW ROUTE
 router.get('/investments/financials/:ticker', investmentController.getFinancials); // NEW ROUTE
 router.get('/investments/dashboard-summary', investmentController.getDashboardSummary);
 
