@@ -518,9 +518,12 @@ const QuantReport = () => {
         }
     }, [mode, selectedAccount]);
 
+    const [usingBenchmarkFallback, setUsingBenchmarkFallback] = useState(false);
+
     const analyzeTicker = async (symbol = null, bench = null, period = null) => {
         setLoading(true);
         setError(null);
+        setUsingBenchmarkFallback(false);
         try {
             // If the target is "Optimized Portfolio", redirect to custom analysis logic
             if ((symbol || ticker) === 'Optimized Portfolio') {
@@ -551,15 +554,46 @@ const QuantReport = () => {
             console.log("Analyze response for", targetTicker, res.data);
 
             if (res.data.error) {
-                setError(res.data.error);
-                setData(null);
+                // Portfolio has no data → fallback to benchmark
+                if (effectiveMode === 'PORTFOLIO') {
+                    setUsingBenchmarkFallback(true);
+                    const benchRes = await api.get(`/investments/analyze/${targetBench}?benchmark=${targetBench}&currency=${currency}&benchmarkCurrency=${benchmarkCurrency}&years=${period || years}`);
+                    if (!benchRes.data.error) {
+                        setData(benchRes.data);
+                    } else {
+                        setError(benchRes.data.error);
+                        setData(null);
+                    }
+                } else {
+                    setError(res.data.error);
+                    setData(null);
+                }
             } else {
                 setData(res.data);
             }
         } catch (err) {
-            console.error(err);
-            setError(err.response?.data?.error || err.message || "No se pudo analizar el ticker. Verifica el símbolo.");
-            setData(null);
+            // Portfolio endpoint may throw 400/404 when empty → try benchmark fallback
+            if (mode === 'PORTFOLIO' && !symbol) {
+                try {
+                    setUsingBenchmarkFallback(true);
+                    const bmark = bench || benchmark;
+                    const bYears = period || years;
+                    const benchRes = await api.get(`/investments/analyze/${bmark}?benchmark=${bmark}&currency=${currency}&benchmarkCurrency=${benchmarkCurrency}&years=${bYears}`);
+                    if (!benchRes.data.error) {
+                        setData(benchRes.data);
+                    } else {
+                        setError(benchRes.data.error);
+                        setData(null);
+                    }
+                } catch (e) {
+                    setError("No hay datos en tu portfolio ni se pudo cargar el benchmark.");
+                    setData(null);
+                }
+            } else {
+                console.error(err);
+                setError(err.response?.data?.error || err.message || "No se pudo analizar el ticker. Verifica el símbolo.");
+                setData(null);
+            }
         } finally {
             setLoading(false);
         }
@@ -1117,6 +1151,17 @@ const QuantReport = () => {
                 <div style={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
                     {loading && <div style={{ padding: '40px', textAlign: 'center', color: '#666', background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>Analizando datos de mercado...</div>}
                     {error && <div style={{ padding: '20px', background: '#ffebee', color: '#c62828', borderRadius: '12px', marginBottom: '20px' }}>{error}</div>}
+                    {usingBenchmarkFallback && data && (
+                        <div style={{ padding: '14px 20px', background: '#e3f0ff', color: '#1565c0', borderRadius: '10px', border: '1px solid #90caf9', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
+                            <span style={{ fontSize: '18px' }}>ℹ️</span>
+                            <span>
+                                <strong>Tu portfolio no tiene datos registrados.</strong> Mostrando datos del benchmark <strong>{benchmark}</strong> como referencia.
+                                Añade inversiones desde la sección "Mis Inversiones" para ver tu portfolio.
+                            </span>
+                        </div>
+                    )}
+
+
 
 
                     {
