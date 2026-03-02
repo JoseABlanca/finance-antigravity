@@ -1691,35 +1691,44 @@ const QuantReport = () => {
                                                 <p style={{ fontSize: '14px', color: '#666', marginBottom: '16px' }}>Simula una estrategia que se rebalancea periódicamente (rebalanceo mensual) usando los pesos de la optimización (Max Sharpe).</p>
                                                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
                                                     <div style={{ padding: '16px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' }}>
-                                                        <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>CAGR</div>
-                                                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: walkforwardData.cagr >= 0 ? '#10b981' : '#ef4444' }}>
-                                                            {(walkforwardData.cagr * 100).toFixed(2)}%
+                                                        <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>Retorno Total</div>
+                                                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: walkforwardData.metrics?.portfolioReturn >= 0 ? '#10b981' : '#ef4444' }}>
+                                                            {((walkforwardData.metrics?.portfolioReturn || 0) * 100).toFixed(2)}%
                                                         </div>
                                                     </div>
                                                     <div style={{ padding: '16px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' }}>
                                                         <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>Max Drawdown</div>
                                                         <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ef4444' }}>
-                                                            {(walkforwardData.maxDrawdown * 100).toFixed(2)}%
+                                                            {((walkforwardData.metrics?.portfolioMaxDrawdown || 0) * 100).toFixed(2)}%
                                                         </div>
                                                     </div>
                                                     <div style={{ padding: '16px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' }}>
-                                                        <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>Sharpe Ratio</div>
-                                                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: walkforwardData.sharpe >= 0 ? '#10b981' : '#ef4444' }}>
-                                                            {walkforwardData.sharpe.toFixed(2)}
+                                                        <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>Benchmark Retorno</div>
+                                                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: walkforwardData.metrics?.benchmarkReturn >= 0 ? '#10b981' : '#ef4444' }}>
+                                                            {((walkforwardData.metrics?.benchmarkReturn || 0) * 100).toFixed(2)}%
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div style={{ height: isMobile ? '300px' : '400px' }}>
+                                                <div style={{ height: isMobile ? '280px' : '380px', width: '100%' }}>
                                                     <Line
                                                         data={{
-                                                            labels: walkforwardData.history.map(d => d.date),
+                                                            labels: walkforwardData.dates || [],
                                                             datasets: [
                                                                 {
-                                                                    label: 'Walkforward Equity (Base 100)',
-                                                                    data: walkforwardData.history.map(d => d.equity * 100),
+                                                                    label: 'Portfolio (Walkforward)',
+                                                                    data: walkforwardData.portfolioEquity || [],
                                                                     borderColor: '#1e88e5',
                                                                     backgroundColor: 'rgba(30, 136, 229, 0.1)',
                                                                     fill: true,
+                                                                    borderWidth: 2,
+                                                                    pointRadius: 0
+                                                                },
+                                                                {
+                                                                    label: 'Benchmark',
+                                                                    data: walkforwardData.benchmarkEquity || [],
+                                                                    borderColor: '#fbbf24',
+                                                                    backgroundColor: 'transparent',
+                                                                    fill: false,
                                                                     borderWidth: 2,
                                                                     pointRadius: 0
                                                                 }
@@ -1728,8 +1737,14 @@ const QuantReport = () => {
                                                         options={{
                                                             responsive: true,
                                                             maintainAspectRatio: false,
-                                                            plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
-                                                            scales: { x: { grid: { display: false } }, y: { grid: { color: '#f5f5f5' } } }
+                                                            plugins: {
+                                                                legend: { display: true, position: 'top' },
+                                                                tooltip: { mode: 'index', intersect: false }
+                                                            },
+                                                            scales: {
+                                                                x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
+                                                                y: { grid: { color: '#f5f5f5' }, title: { display: true, text: 'Capital (€)' } }
+                                                            }
                                                         }}
                                                     />
                                                 </div>
