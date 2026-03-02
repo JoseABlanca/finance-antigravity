@@ -13,12 +13,12 @@ import FinancialAnalysis from '../components/FinancialAnalysis';
 ChartJS.register(CategoryScale, LinearScale, LogarithmicScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler, LineController, BarController, ScatterController, annotationPlugin);
 
 const QuantReport = () => {
-    const [ticker, setTicker] = useState('AAPL');
+    const [ticker, setTicker] = useState('');
     const [benchmark, setBenchmark] = useState('SPY');
     const [years, setYears] = useState(5);
 
     // New State Variables
-    const [mode, setMode] = useState("TICKER");
+    const [mode, setMode] = useState("PORTFOLIO");
     const [mcSource, setMcSource] = useState('strategy'); // 'strategy', 'benchmark', 'portfolio'
     const [portfolioData, setPortfolioData] = useState(null); // Cache for My Portfolio data
     const [currency, setCurrency] = useState("USD"); // USD or EUR for ticker
@@ -124,15 +124,20 @@ const QuantReport = () => {
         // Fetch Walkforward
         setWalkforwardLoading(true);
         try {
-            const resWf = await api.post('/investments/walkforward', {
-                tickers: tickersList,
-                startDate,
-                endDate,
-                years
-            });
-            setWalkforwardData(resWf.data);
+            const bestWeightsObj = res.data.bestPortfolio?.weights || {};
+            const bestTickersList = Object.keys(bestWeightsObj);
+            const bestWeightsArr = Object.values(bestWeightsObj);
+            if (bestTickersList.length > 0) {
+                const resWf2 = await api.post('/investments/walkforward', {
+                    tickers: bestTickersList,
+                    weights: bestWeightsArr,
+                    years
+                });
+                setWalkforwardData(resWf2.data);
+            }
         } catch (err) {
             console.error("Walkforward error:", err);
+            setWalkforwardData(null);
         } finally {
             setWalkforwardLoading(false);
         }
@@ -1262,7 +1267,7 @@ const QuantReport = () => {
                                                                         info = {
                                                                             return: p.return * 100,
                                                                             risk: (optMetric === 'volatility' ? p.volatility : Math.abs(p.maxDrawdown)) * 100,
-                                                                            label: optMetric === 'volatility' ? 'Max Sharpe' : 'Max RT/DD'
+                                                                            label: optMetric === 'volatility' ? 'Max Sharpe' : 'Max RT/Avg DD'
                                                                         };
                                                                     } else if (datasetIndex === 2) {
                                                                         // Min Vol/DD
@@ -1315,7 +1320,7 @@ const QuantReport = () => {
                                                         </div>
                                                         <div style={{ marginBottom: '12px', fontSize: '14px' }}>
                                                             <strong>Ret:</strong> {selectedPortfolioInfo.return.toFixed(2)}% |
-                                                            <strong> {optMetric === 'volatility' ? 'Vol' : 'Max DD'}:</strong> {selectedPortfolioInfo.risk.toFixed(2)}%
+                                                            <strong> {optMetric === 'volatility' ? 'Vol' : 'Avg DD'}:</strong> {selectedPortfolioInfo.risk.toFixed(2)}%
                                                         </div>
                                                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                                                             <thead>
@@ -1336,17 +1341,17 @@ const QuantReport = () => {
                                                 {/* Optimization Target Card */}
                                                 <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                                                     <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold', color: '#dc2626' }}>
-                                                        {optMetric === 'volatility' ? 'Max Sharpe Ratio' : 'Max RT/Max DD'}
+                                                        {optMetric === 'volatility' ? 'Max Sharpe Ratio' : 'Max RT/Avg DD'}
                                                     </h3>
                                                     <div style={{ marginBottom: '12px', fontSize: '14px' }}>
                                                         {(() => {
                                                             const p = optMetric === 'volatility' ? optData.bestPortfolio : optData.maxCalmarPortfolio;
-                                                            const metricLabel = optMetric === 'volatility' ? 'Sharpe' : 'RT/Max DD';
-                                                            const metricValue = optMetric === 'volatility' ? p.sharpe : (p.return / Math.abs(p.maxDrawdown));
+                                                            const metricLabel = optMetric === 'volatility' ? 'Sharpe' : 'RT/Avg DD';
+                                                            const metricValue = optMetric === 'volatility' ? p.sharpe : (p.return / Math.abs(p.avgDrawdown || p.maxDrawdown || 0.001));
                                                             return (
                                                                 <>
                                                                     <strong>Ret:</strong> {(p.return * 100).toFixed(2)}% |
-                                                                    <strong> {optMetric === 'volatility' ? 'Vol' : 'Max DD'}:</strong> {((optMetric === 'volatility' ? p.volatility : Math.abs(p.maxDrawdown)) * 100).toFixed(2)}% |
+                                                                    <strong> {optMetric === 'volatility' ? 'Vol' : 'Avg DD'}:</strong> {((optMetric === 'volatility' ? p.volatility : Math.abs(p.avgDrawdown || p.maxDrawdown)) * 100).toFixed(2)}% |
                                                                     <strong> {metricLabel}:</strong> {metricValue.toFixed(2)}
                                                                 </>
                                                             );
@@ -2301,7 +2306,7 @@ const QuantReport = () => {
                                     {/* LEFT COLUMN: CHARTS */}
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
                                         {/* Cumulative Returns - Normal Scale */}
-                                        <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '300px' : '400px' }}>
+                                        <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '300px' : '400px', overflow: 'hidden', maxWidth: '100%' }}>
                                             <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold' }}>Cumulative Returns vs Benchmark</h3>
                                             <div style={{ height: 'calc(100% - 40px)' }}>
                                                 <Line
@@ -2355,7 +2360,7 @@ const QuantReport = () => {
 
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '24px' }}>
                                             {/* EOY Returns Chart */}
-                                            <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '300px' : '400px' }}>
+                                            <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '300px' : '400px', overflow: 'hidden', maxWidth: '100%' }}>
                                                 <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold' }}>EOY Returns vs Benchmark</h3>
                                                 <div style={{ height: 'calc(100% - 40px)' }}>
                                                     <Bar
