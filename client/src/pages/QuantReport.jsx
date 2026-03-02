@@ -89,12 +89,14 @@ const QuantReport = () => {
         setSelectedPortfolioInfo(null);
         const tickersList = optTickers.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0);
 
+        let optRes = null;
         try {
             const res = await api.post('/investments/optimize', {
                 tickers: tickersList,
                 years: years,
                 currency: currency
             });
+            optRes = res;
             setOptData(res.data);
         } catch (err) {
             console.error(err);
@@ -124,7 +126,9 @@ const QuantReport = () => {
         // Fetch Walkforward
         setWalkforwardLoading(true);
         try {
-            const bestWeightsObj = res.data.bestPortfolio?.weights || {};
+            const bestWeightsObj = optRes?.data?.bestPortfolio?.weights || {};
+            console.log("[Walkforward] optRes:", optRes?.data?.bestPortfolio);
+            console.log("[Walkforward] weights:", bestWeightsObj);
             const bestTickersList = Object.keys(bestWeightsObj);
             const bestWeightsArr = Object.values(bestWeightsObj);
             if (bestTickersList.length > 0) {
@@ -1200,7 +1204,7 @@ const QuantReport = () => {
                                                         }}
                                                     >
                                                         <option value="volatility">Volatility (Risk)</option>
-                                                        <option value="maxDrawdown">Max Drawdown</option>
+                                                        <option value="maxDrawdown">Avg Drawdown</option>
                                                     </select>
                                                 </div>
                                                 <div style={{ height: 'calc(100% - 60px)' }}>
@@ -2692,7 +2696,15 @@ const QuantReport = () => {
                                                         ...chartOptions,
                                                         plugins: {
                                                             legend: { display: false },
-                                                            tooltip: { mode: 'index', intersect: false }
+                                                            tooltip: { mode: 'index', intersect: false },
+                                                            zoom: {
+                                                                pan: { enabled: true, mode: 'x' },
+                                                                zoom: {
+                                                                    wheel: { enabled: true },
+                                                                    pinch: { enabled: true },
+                                                                    mode: 'x'
+                                                                }
+                                                            }
                                                         },
                                                         interaction: {
                                                             mode: 'nearest',
@@ -2700,7 +2712,7 @@ const QuantReport = () => {
                                                             intersect: false
                                                         },
                                                         scales: {
-                                                            x: { display: false }, // Hide x labels for cleanliness on daily bars
+                                                            x: { display: false },
                                                             y: { title: { display: true, text: 'Return %' } }
                                                         }
                                                     }}
