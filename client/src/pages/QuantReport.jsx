@@ -1168,7 +1168,7 @@ const QuantReport = () => {
                                                                     order: 4
                                                                 },
                                                                 {
-                                                                    label: optMetric === 'volatility' ? 'Max Sharpe' : 'Max RT/Max DD',
+                                                                    label: optMetric === 'volatility' ? 'Max Sharpe' : 'Max RT/Avg DD',
                                                                     data: [{
                                                                         x: (optMetric === 'volatility' ? optData.bestPortfolio.volatility : Math.abs(optData.maxCalmarPortfolio.maxDrawdown)) * 100,
                                                                         y: (optMetric === 'volatility' ? optData.bestPortfolio.return : optData.maxCalmarPortfolio.return) * 100
@@ -1222,7 +1222,7 @@ const QuantReport = () => {
                                                                 x: {
                                                                     title: {
                                                                         display: true,
-                                                                        text: optMetric === 'volatility' ? 'Volatility (Risk) %' : 'Max Drawdown %'
+                                                                        text: optMetric === 'volatility' ? 'Volatility (Risk) %' : 'Avg Drawdown %'
                                                                     }
                                                                 },
                                                                 y: { title: { display: true, text: 'Return (CAGR) %' } }
@@ -1234,7 +1234,7 @@ const QuantReport = () => {
                                                                             const label = ctx.dataset.label || '';
                                                                             const xValue = ctx.raw.x.toFixed(2);
                                                                             const yValue = ctx.raw.y.toFixed(2);
-                                                                            const xLabel = optMetric === 'volatility' ? 'Risk' : 'Max DD';
+                                                                            const xLabel = optMetric === 'volatility' ? 'Risk' : 'Avg DD';
                                                                             return `${label === 'Portfolios' ? '' : label + ': '}${xLabel}: ${xValue}% | Ret: ${yValue}%`;
                                                                         }
                                                                     }
@@ -1492,7 +1492,7 @@ const QuantReport = () => {
                                                                 mode: 'markers',
                                                                 type: 'scatter3d',
                                                                 marker: { color: '#dc2626', size: 10, symbol: 'diamond', line: { color: 'white', width: 2 } },
-                                                                name: optMetric === 'volatility' ? 'Max Sharpe' : 'Max RT/Max DD'
+                                                                name: optMetric === 'volatility' ? 'Max Sharpe' : 'Max RT/Avg DD'
                                                             },
                                                             (() => {
                                                                 const targetPort = optMetric === 'volatility' ? optData.minVolPortfolio : optData.minDrawdownPortfolio;
@@ -1520,7 +1520,7 @@ const QuantReport = () => {
                                                                     mode: 'markers',
                                                                     type: 'scatter3d',
                                                                     marker: { color: '#fbbf24', size: 10, symbol: 'square', line: { color: 'white', width: 2 } },
-                                                                    name: optMetric === 'volatility' ? 'Min Volatility' : 'Min Max Drawdown'
+                                                                    name: optMetric === 'volatility' ? 'Min Volatility' : 'Min Avg Drawdown'
                                                                 };
                                                             })()
                                                         ].filter(Boolean)}
@@ -1531,7 +1531,7 @@ const QuantReport = () => {
                                                             plot_bgcolor: 'rgba(0,0,0,0)',
                                                             scene: {
                                                                 xaxis: { title: 'Retorno %', gridcolor: '#eee' },
-                                                                yaxis: { title: (optMetric === 'volatility' ? 'Volatilidad' : 'Max Drawdown') + ' %', gridcolor: '#eee' },
+                                                                yaxis: { title: (optMetric === 'volatility' ? 'Volatilidad' : 'Avg Drawdown') + ' %', gridcolor: '#eee' },
                                                                 zaxis: { title: 'Densidad', gridcolor: '#eee' },
                                                                 camera: { eye: { x: 1.8, y: 1.8, z: 1.2 } },
                                                                 backgroundColor: 'white'
@@ -1663,7 +1663,16 @@ const QuantReport = () => {
                                                     />
                                                 </div>
                                             </div>
-                                        ) : <p>No hay datos walkforward disponibles. Ejecute la optimización primero.</p>}
+                                        ) : (
+                                            <div style={{ padding: '24px', background: '#f0f4ff', borderRadius: '10px', border: '1px solid #c7d7f8', color: '#334' }}>
+                                                <h4 style={{ margin: '0 0 10px 0', fontSize: '16px', color: '#1e3a8a' }}>⚠️ Sin datos de Walkforward</h4>
+                                                <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6' }}>
+                                                    El análisis Walkforward simula rebalanceos periódicos usando los pesos del portfolio óptimo (Max Sharpe).
+                                                    Para generar estos datos, primero debe ejecutar la optimización haciendo clic en el botón <strong>"Optimizar"</strong> del sidebar.
+                                                    Una vez completada la optimización, los datos de Walkforward se cargarán automáticamente.
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </>
@@ -1674,54 +1683,41 @@ const QuantReport = () => {
                         mode === 'RISK_ANALYSIS' && (
                             <div style={{}}>
                                 <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', marginBottom: '24px' }}>
-                                    <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>
                                         Monte Carlo Simulation
-                                        <select
-                                            value={mcSource}
-                                            onChange={(e) => {
-                                                setMcSource(e.target.value);
-                                                // Trigger run handled by useEffect
-                                            }}
-                                            style={{
-                                                fontSize: '14px',
-                                                padding: '4px 8px',
-                                                borderRadius: '6px',
-                                                border: '1px solid #ddd',
-                                                fontWeight: 'normal',
-                                                color: '#444'
-                                            }}
-                                        >
-                                            <option value="strategy">{mode === 'PORTFOLIO' ? 'My Portfolio' : (data && data.isCustom ? 'Selected Portfolio' : ticker)}</option>
-                                            <option value="portfolio">My Portfolio</option>
-                                            <option value="benchmark">{benchmark}</option>
-                                            {optData && <option value="optimizer">Optimizer Portfolio</option>}
-                                            {selectedWeights && <option value="selected">Current Selection</option>}
-                                        </select>
-
-                                        {mcSource === 'optimizer' && (
-                                            <select
-                                                value={optimizerPortfolio}
-                                                onChange={(e) => setOptimizerPortfolio(e.target.value)}
-                                                style={{
-                                                    fontSize: '14px',
-                                                    padding: '4px 8px',
-                                                    borderRadius: '6px',
-                                                    border: '1px solid #ddd',
-                                                    fontWeight: 'normal',
-                                                    color: '#444',
-                                                    marginLeft: '8px'
-                                                }}
-                                            >
-                                                <option value="maxSharpe">Max Sharpe Ratio</option>
-                                                <option value="minVol">Min Volatility</option>
-                                                <option value="minDrawdown">Min Max Drawdown</option>
-                                                {kde3dData && <option value="expectedValue">Expected Value (Mean)</option>}
-                                            </select>
-                                        )}
                                     </h2>
-                                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '24px' }}>
-                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                            <label style={{ fontSize: '12px', color: '#666' }}>Simulations</label>
+                                    <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', marginBottom: '24px', flexWrap: 'wrap' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                            <label style={{ fontSize: '12px', color: '#666' }}>Fuente de Datos</label>
+                                            <select
+                                                value={mcSource}
+                                                onChange={(e) => setMcSource(e.target.value)}
+                                                style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px', background: '#f8f9fa' }}
+                                            >
+                                                <option value="strategy">{ticker ? ticker : 'Mi Portfolio'}</option>
+                                                {!ticker && portfolioAssets.length === 0 && <option value="benchmark">{benchmark || 'Benchmark'}</option>}
+                                                {portfolioAssets.length > 0 && <option value="portfolio">Mi Portfolio (Completo)</option>}
+                                                <option value="benchmark">{benchmark || 'Benchmark'}</option>
+                                                {optData && <option value="optimizer">Optimizer Portfolio</option>}
+                                            </select>
+                                        </div>
+                                        {mcSource === 'optimizer' && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                <label style={{ fontSize: '12px', color: '#666' }}>Tipo de Optimizer</label>
+                                                <select
+                                                    value={optimizerPortfolio}
+                                                    onChange={(e) => setOptimizerPortfolio(e.target.value)}
+                                                    style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px', background: '#f8f9fa' }}
+                                                >
+                                                    <option value="maxSharpe">Max Sharpe Ratio</option>
+                                                    <option value="minVol">Min Volatility</option>
+                                                    <option value="minDrawdown">Min Max Drawdown</option>
+                                                    {kde3dData && <option value="expectedValue">Expected Value (Mean)</option>}
+                                                </select>
+                                            </div>
+                                        )}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                            <label style={{ fontSize: '12px', color: '#666' }}>Simulaciones</label>
                                             <input
                                                 type="number"
                                                 value={mcSimulations}
@@ -1734,7 +1730,7 @@ const QuantReport = () => {
                                             disabled={mcLoading}
                                             style={{
                                                 padding: '8px 24px', background: '#1E88E5', color: 'white', borderRadius: '6px', border: 'none',
-                                                marginTop: '16px', cursor: 'pointer', opacity: mcLoading ? 0.7 : 1
+                                                cursor: 'pointer', opacity: mcLoading ? 0.7 : 1, alignSelf: 'flex-end'
                                             }}>
                                             {mcLoading ? 'Running...' : 'Run Simulation'}
                                         </button>

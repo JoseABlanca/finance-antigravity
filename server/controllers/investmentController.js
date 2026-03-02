@@ -1832,16 +1832,19 @@ exports.optimizePortfolio = async (req, res) => {
                 return row.reduce((sum, r, idx) => sum + (r * weights[idx]), 0);
             });
 
-            // Calculate Max Drawdown for the portfolio
+            // Calculate Max Drawdown and Average Drawdown for the portfolio
             let peak = 1;
             let currentPrice = 1;
             let portMaxDD = 0;
+            let portDDSum = 0;
             portDailyReturns.forEach(r => {
                 currentPrice *= (1 + r);
                 if (currentPrice > peak) peak = currentPrice;
                 const dd = (currentPrice - peak) / peak;
                 if (dd < portMaxDD) portMaxDD = dd;
+                portDDSum += dd; // sum all daily drawdown values (negatives)
             });
+            const portAvgDD = portDailyReturns.length > 0 ? portDDSum / portDailyReturns.length : 0;
 
             const portMeanDaily = mean(portDailyReturns);
             const portStdDaily = std(portDailyReturns, portMeanDaily);
@@ -1854,6 +1857,7 @@ exports.optimizePortfolio = async (req, res) => {
                 return: annualizedReturn,
                 volatility: annualizedVol,
                 maxDrawdown: portMaxDD,
+                avgDrawdown: portAvgDD,
                 sharpe: sharpe,
                 weights: weights
             });
@@ -1864,10 +1868,10 @@ exports.optimizePortfolio = async (req, res) => {
         const minVolPort = results.reduce((p, c) => (c.volatility < p.volatility ? c : p));
         const minDDPort = results.reduce((p, c) => (Math.abs(c.maxDrawdown) < Math.abs(p.maxDrawdown) ? c : p));
 
-        // Max Return / Max Drawdown ratio (Calmar-like Optimization)
+        // Max Return / Avg Drawdown ratio (Calmar-like with average drawdown)
         const maxCalmarPort = results.reduce((p, c) => {
-            const rP = p.return / (Math.abs(p.maxDrawdown) || 0.001);
-            const rC = c.return / (Math.abs(c.maxDrawdown) || 0.001);
+            const rP = p.return / (Math.abs(p.avgDrawdown) || 0.001);
+            const rC = c.return / (Math.abs(c.avgDrawdown) || 0.001);
             return rC > rP ? c : p;
         });
 
