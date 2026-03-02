@@ -1643,8 +1643,25 @@ const QuantReport = () => {
                                                                 <td style={{ padding: '8px', borderBottom: '1px solid #eee', fontWeight: 'bold', textAlign: 'left' }}>{t1}</td>
                                                                 {correlationData.tickers.map((t2, j) => {
                                                                     const val = correlationData.matrix[i][j];
-                                                                    const color = val > 0.8 ? '#d62728' : val > 0.5 ? '#ff7f0e' : val > 0 ? '#ffbb78' : val > -0.5 ? '#1f77b4' : '#aec7e8';
-                                                                    const textColor = val > 0.5 || val < -0.5 ? 'white' : '#333';
+                                                                    // Green (negative corr) → White (no corr) → Red (positive corr)
+                                                                    let color, textColor;
+                                                                    if (i === j) {
+                                                                        color = '#4caf50'; textColor = 'white'; // diagonal = perfect 1.0 = dark green
+                                                                    } else if (val > 0) {
+                                                                        const intensity = Math.min(val, 1);
+                                                                        const r = Math.round(255);
+                                                                        const g = Math.round(255 - 180 * intensity);
+                                                                        const b = Math.round(255 - 180 * intensity);
+                                                                        color = `rgb(${r},${g},${b})`;
+                                                                        textColor = intensity > 0.5 ? 'white' : '#333';
+                                                                    } else {
+                                                                        const intensity = Math.min(Math.abs(val), 1);
+                                                                        const r = Math.round(255 - 180 * intensity);
+                                                                        const g = Math.round(255);
+                                                                        const b = Math.round(255 - 180 * intensity);
+                                                                        color = `rgb(${r},${g},${b})`;
+                                                                        textColor = intensity > 0.5 ? 'white' : '#333';
+                                                                    }
                                                                     return (
                                                                         <td key={t2} style={{ padding: '8px', borderBottom: '1px solid #eee', color: textColor, background: color }}>
                                                                             {val.toFixed(2)}
@@ -2349,11 +2366,11 @@ const QuantReport = () => {
                                     alignItems: 'start'
                                 }}>
                                     {/* LEFT COLUMN: CHARTS */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0, width: '100%', overflow: 'hidden' }}>
                                         {/* Cumulative Returns - Normal Scale */}
-                                        <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '300px' : '400px', overflow: 'hidden', maxWidth: '100%' }}>
+                                        <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', width: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
                                             <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold' }}>Cumulative Returns vs Benchmark</h3>
-                                            <div style={{ height: 'calc(100% - 40px)' }}>
+                                            <div style={{ height: isMobile ? '240px' : '340px', width: '100%' }}>
                                                 <Line
                                                     data={{
                                                         labels: data.cumulativeReturns?.map(d => d.date) || [],
@@ -2405,9 +2422,9 @@ const QuantReport = () => {
 
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '24px' }}>
                                             {/* EOY Returns Chart */}
-                                            <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '300px' : '400px', overflow: 'hidden', maxWidth: '100%' }}>
+                                            <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', width: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
                                                 <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold' }}>EOY Returns vs Benchmark</h3>
-                                                <div style={{ height: 'calc(100% - 40px)' }}>
+                                                <div style={{ height: isMobile ? '240px' : '340px', width: '100%' }}>
                                                     <Bar
                                                         data={(() => {
                                                             // EOY Returns + Current YTD
@@ -2800,9 +2817,9 @@ const QuantReport = () => {
                                         {data.rollingMetrics && data.rollingMetrics.length > 0 && (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '24px' }}>
                                                 {/* Rolling Beta */}
-                                                <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '250px' : '350px' }}>
+                                                <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', width: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
                                                     <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold' }}>Rolling Beta (6M & 12M)</h3>
-                                                    <div style={{ height: 'calc(100% - 40px)' }}>
+                                                    <div style={{ height: isMobile ? '220px' : '300px', width: '100%' }}>
                                                         <Line
                                                             data={{
                                                                 labels: data.rollingMetrics.map(d => d.date),
@@ -2866,9 +2883,9 @@ const QuantReport = () => {
                                                 </div>
 
                                                 {/* Rolling Volatility */}
-                                                <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '250px' : '350px' }}>
+                                                <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', width: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
                                                     <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold' }}>Rolling Volatility (6-Months)</h3>
-                                                    <div style={{ height: 'calc(100% - 40px)' }}>
+                                                    <div style={{ height: isMobile ? '220px' : '300px', width: '100%' }}>
                                                         <Line
                                                             data={{
                                                                 labels: data.rollingMetrics.map(d => d.date),
@@ -2931,9 +2948,9 @@ const QuantReport = () => {
                                                 </div>
 
                                                 {/* Rolling Sharpe */}
-                                                <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '250px' : '350px' }}>
+                                                <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', width: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
                                                     <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold' }}>Rolling Sharpe (6-Months)</h3>
-                                                    <div style={{ height: 'calc(100% - 40px)' }}>
+                                                    <div style={{ height: isMobile ? '220px' : '300px', width: '100%' }}>
                                                         <Line
                                                             data={{
                                                                 labels: data.rollingMetrics.map(d => d.date),
@@ -2987,62 +3004,7 @@ const QuantReport = () => {
                                                     </div>
                                                 </div>
 
-                                                {/* Rolling Sortino */}
-                                                <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '250px' : '350px' }}>
-                                                    <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold' }}>Rolling Sortino (6-Months)</h3>
-                                                    <div style={{ height: 'calc(100% - 40px)' }}>
-                                                        <Line
-                                                            data={{
-                                                                labels: data.rollingMetrics.map(d => d.date),
-                                                                datasets: [
-                                                                    {
-                                                                        label: `Sortino Ratio (${strategyLabel})`,
-                                                                        data: data.rollingMetrics.map(d => d.sortino),
-                                                                        borderColor: '#618ac9',
-                                                                        borderWidth: 2,
-                                                                        tension: 0.1,
-                                                                        pointRadius: 0
-                                                                    },
-                                                                    {
-                                                                        label: 'Average',
-                                                                        data: data.rollingMetrics.map(() => {
-                                                                            const valid = data.rollingMetrics.map(d => d.sortino).filter(v => !isNaN(v));
-                                                                            return valid.reduce((a, b) => a + b, 0) / valid.length;
-                                                                        }),
-                                                                        borderColor: '#dc2626',
-                                                                        borderWidth: 2,
-                                                                        borderDash: [5, 5],
-                                                                        tension: 0,
-                                                                        pointRadius: 0
-                                                                    }
-                                                                ]
-                                                            }}
-                                                            options={{
-                                                                ...chartOptions,
-                                                                plugins: {
-                                                                    ...chartOptions.plugins,
-                                                                    tooltip: { mode: 'index', intersect: false }
-                                                                },
-                                                                interaction: {
-                                                                    mode: 'nearest',
-                                                                    axis: 'x',
-                                                                    intersect: false
-                                                                },
-                                                                scales: {
-                                                                    y: {
-                                                                        grid: {
-                                                                            display: true,
-                                                                            color: '#f5f5f5',
-                                                                            drawBorder: false
-                                                                        },
-                                                                        title: { display: true, text: 'Sortino Ratio' }
-                                                                    },
-                                                                    x: chartOptions.scales.x
-                                                                }
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </div>
+
                                             </div>
                                         )}
 
