@@ -1,28 +1,65 @@
 const db = require('../db');
 const { sendEmail } = require('../services/emailService');
 
+exports.getFirstTransactionDate = (req, res) => {
+    try {
+        const result = db.prepare('SELECT MIN(date) as minDate FROM transactions').get();
+        res.json({ minDate: result.minDate || new Date().toISOString().split('T')[0] });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
 // Helper to get date ranges for periods
 const getPeriodRange = (year, period) => {
     if (!period || period === 'ANNUAL') {
         return { start: `${year}-01-01`, end: `${year}-12-31`, label: `${year}` };
     }
     if (period.startsWith('M')) {
-        const monthNum = period.substring(1).padStart(2, '0');
-        const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-        const monthIdx = parseInt(monthNum) - 1;
+        let monthNum = period.substring(1);
+        if (isNaN(parseInt(monthNum))) {
+            monthNum = String(new Date().getMonth() + 1).padStart(2, '0');
+        } else {
+            monthNum = monthNum.padStart(2, '0');
+        }
+
         const lastDay = new Date(year, parseInt(monthNum), 0).getDate();
         return {
             start: `${year}-${monthNum}-01`,
             end: `${year}-${monthNum}-${lastDay}`,
-            label: `${months[monthIdx]} ${year}`
+            label: `${monthNum}/${String(year).substring(2)}`
         };
     }
     return { start: `${year}-01-01`, end: `${year}-12-31`, label: `${year}` };
 };
 
-const getComparisonPeriods = (year, period, count = 1) => { // Default to 1 if no comparison
+const getComparisonPeriods = (year, period, count = 1, customRange = null) => {
     let periods = [];
     let currentYear = parseInt(year);
+
+    if (customRange) {
+        const { from, to, type } = customRange;
+        if (type === 'ANNUAL') {
+            for (let y = from.year; y <= to.year; y++) {
+                periods.push(getPeriodRange(y, 'ANNUAL'));
+            }
+        } else {
+            let currY = from.year;
+            let currM = from.month;
+            const endY = to.year;
+            const endM = to.month;
+
+            while (currY < endY || (currY === endY && currM <= endM)) {
+                periods.push(getPeriodRange(currY, `M${String(currM).padStart(2, '0')}`));
+                currM++;
+                if (currM > 12) {
+                    currM = 1;
+                    currY++;
+                }
+            }
+        }
+        return periods;
+    }
 
     if (!period || period === 'ANNUAL') {
         for (let i = count - 1; i >= 0; i--) {
@@ -30,14 +67,10 @@ const getComparisonPeriods = (year, period, count = 1) => { // Default to 1 if n
         }
     } else {
         let targetPeriod = period.toUpperCase();
-        let mIdx = 11; // Default to Dec
-
+        let mIdx = 11;
         if (targetPeriod === 'MONTHLY') {
             const now = new Date();
-            const nowYear = now.getFullYear();
-            if (nowYear === currentYear) {
-                mIdx = now.getMonth();
-            }
+            if (now.getFullYear() === currentYear) mIdx = now.getMonth();
         } else if (targetPeriod.startsWith('M')) {
             mIdx = parseInt(targetPeriod.substring(1)) - 1;
         }
@@ -68,11 +101,9 @@ exports.sendReport = async (req, res) => {
         const balances = stmtBalances.all();
 
         let assets = 0, liabilities = 0, equity = 0, revenue = 0, expenses = 0;
-
         balances.forEach(b => {
             const netDr = (b.total_debit || 0) - (b.total_credit || 0);
             const netCr = (b.total_credit || 0) - (b.total_debit || 0);
-
             if (b.type === 'ASSET') assets += netDr;
             else if (b.type === 'LIABILITY') liabilities += netCr;
             else if (b.type === 'EQUITY') equity += netCr;
@@ -92,7 +123,6 @@ exports.sendReport = async (req, res) => {
                 <div style="padding: 24px;">
                     <p>Hola,</p>
                     <p>Aquí tienes el resumen de tu estado financiero actual generado desde <strong>FinancePro</strong>.</p>
-                    
                     <div style="display: flex; gap: 16px; margin: 24px 0;">
                         <div style="flex: 1; padding: 16px; background: #f5f5f5; border-radius: 8px; text-align: center;">
                             <div style="font-size: 12px; text-transform: uppercase; color: #666; font-weight: bold;">Patrimonio Neto</div>
@@ -107,34 +137,8 @@ exports.sendReport = async (req, res) => {
                             </div>
                         </div>
                     </div>
-
-                    <h3 style="border-bottom: 2px solid #eee; padding-bottom: 8px;">Desglose General</h3>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 12px 0;">Activos Totales</td>
-                            <td style="text-align: right; font-weight: bold;">${new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(assets)}</td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 12px 0;">Pasivos Totales</td>
-                            <td style="text-align: right; font-weight: bold;">${new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(liabilities)}</td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 12px 0;">Ingresos (Total Histórico)</td>
-                            <td style="text-align: right; font-weight: bold; color: #2e7d32;">${new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(revenue)}</td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 12px 0;">Gastos (Total Histórico)</td>
-                            <td style="text-align: right; font-weight: bold; color: #c62828;">${new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(expenses)}</td>
-                        </tr>
-                    </table>
-
-                    <p style="margin-top: 32px; font-size: 12px; color: #999; text-align: center;">
-                        Este reporte fue generado automáticamente el ${new Date().toLocaleDateString('es-ES')}.
-                    </p>
                 </div>
-            </div>
-        `;
-
+            </div>`;
         const result = await sendEmail(email, 'Tu Reporte Financiero Personal', html);
         res.json({ message: 'Report sent successfully', previewUrl: result.previewUrl });
     } catch (err) {
@@ -144,20 +148,34 @@ exports.sendReport = async (req, res) => {
 
 exports.getBalanceSheet = (req, res) => {
     const { year, period, comparison } = req.query;
-    if (!year) return res.status(400).json({ error: 'Year is required' });
-
     try {
-        const periods = comparison === 'true' ? getComparisonPeriods(year, period, 6) : [getPeriodRange(year, period)];
+        let periods = [];
+        if (comparison === 'custom') {
+            const customRange = {
+                from: { year: parseInt(req.query.fromYear), month: parseInt(req.query.fromMonth) },
+                to: { year: parseInt(req.query.toYear), month: parseInt(req.query.toMonth) },
+                type: 'MONTHLY'
+            };
+            periods = getComparisonPeriods(year, period, 1, customRange);
+        } else if (comparison === 'true') {
+            periods = getComparisonPeriods(year, period, 6);
+        } else {
+            periods = [getPeriodRange(year, period)];
+        }
 
         const results = periods.map(p => {
             const stmt = db.prepare(`
                 SELECT a.id, a.code, a.name, a.type, a.subtype, a.parent_id,
-                       SUM(je.debit) as total_debit, SUM(je.credit) as total_credit
+                       IFNULL(bal.total_debit, 0) as total_debit, IFNULL(bal.total_credit, 0) as total_credit
                 FROM accounts a
-                LEFT JOIN journal_entries je ON a.id = je.account_id
-                LEFT JOIN transactions t ON je.transaction_id = t.id
+                LEFT JOIN (
+                    SELECT je.account_id, SUM(je.debit) as total_debit, SUM(je.credit) as total_credit
+                    FROM journal_entries je
+                    JOIN transactions t ON je.transaction_id = t.id
+                    WHERE t.date <= ?
+                    GROUP BY je.account_id
+                ) bal ON a.id = bal.account_id
                 WHERE a.type IN ('ASSET', 'LIABILITY', 'EQUITY')
-                  AND (t.date IS NULL OR t.date <= ?)
                 GROUP BY a.id
             `);
             const rows = stmt.all(p.end);
@@ -170,7 +188,7 @@ exports.getBalanceSheet = (req, res) => {
             return { period: p.label, accounts };
         });
 
-        res.json({ year, period: period || 'ANNUAL', comparison: comparison === 'true', results });
+        res.json({ year, period, results });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -178,10 +196,20 @@ exports.getBalanceSheet = (req, res) => {
 
 exports.getProfitAndLoss = (req, res) => {
     const { year, period, comparison } = req.query;
-    if (!year) return res.status(400).json({ error: 'Year is required' });
-
     try {
-        const periods = comparison === 'true' ? getComparisonPeriods(year, period, 6) : [getPeriodRange(year, period)];
+        let periods = [];
+        if (comparison === 'custom') {
+            const customRange = {
+                from: { year: parseInt(req.query.fromYear), month: parseInt(req.query.fromMonth) },
+                to: { year: parseInt(req.query.toYear), month: parseInt(req.query.toMonth) },
+                type: 'MONTHLY'
+            };
+            periods = getComparisonPeriods(year, period, 1, customRange);
+        } else if (comparison === 'true') {
+            periods = getComparisonPeriods(year, period, 6);
+        } else {
+            periods = [getPeriodRange(year, period)];
+        }
 
         const results = periods.map(p => {
             const stmt = db.prepare(`
@@ -204,202 +232,91 @@ exports.getProfitAndLoss = (req, res) => {
             return { period: p.label, accounts };
         });
 
-        res.json({ year, period: period || 'ANNUAL', comparison: comparison === 'true', results });
+        res.json({ year, period, results });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 };
 
 exports.getCashFlow = (req, res) => {
-    const { year, period } = req.query;
-    if (!year) return res.status(400).json({ error: 'Year is required' });
-
+    const { year, period, comparison } = req.query;
     try {
-        const { start, end } = getPeriodRange(year, period);
+        let periods = [];
+        if (comparison === 'custom') {
+            const customRange = {
+                from: { year: parseInt(req.query.fromYear), month: parseInt(req.query.fromMonth) },
+                to: { year: parseInt(req.query.toYear), month: parseInt(req.query.toMonth) },
+                type: 'MONTHLY'
+            };
+            periods = getComparisonPeriods(year, period, 1, customRange);
+        } else if (comparison === 'true') {
+            periods = getComparisonPeriods(year, period, 6);
+        } else {
+            periods = [getPeriodRange(year, period)];
+        }
 
-        // Simplified Cash Flow: All movements in liquid accounts (Bancos/Caja)
-        // Categorized by the OTHER side of the entry
         const stmtLiquidIds = db.prepare(`SELECT id FROM accounts WHERE code LIKE '57%'`);
         const liquidAccountIds = stmtLiquidIds.all().map(a => a.id);
+        if (liquidAccountIds.length === 0) return res.json({ year, results: [] });
 
-        if (liquidAccountIds.length === 0) return res.json({ year, activities: [] });
-
-        const stmtMoves = db.prepare(`
-            SELECT 
-                a.type as category,
+        const results = periods.map(p => {
+            const stmtMoves = db.prepare(`
+                SELECT a.type as category,
                 SUM(CASE WHEN je.debit > 0 THEN je.debit ELSE -je.credit END) as net_cash
-            FROM journal_entries je
-            JOIN transactions t ON je.transaction_id = t.id
-            JOIN journal_entries other ON t.id = other.transaction_id AND other.id != je.id
-            JOIN accounts a ON other.account_id = a.id
-            WHERE je.account_id IN (${liquidAccountIds.join(',')})
-              AND t.date BETWEEN ? AND ?
-            GROUP BY a.type
-        `);
+                FROM journal_entries je
+                JOIN transactions t ON je.transaction_id = t.id
+                JOIN journal_entries other ON t.id = other.transaction_id AND other.id != je.id
+                JOIN accounts a ON other.account_id = a.id
+                WHERE je.account_id IN (${liquidAccountIds.join(',')})
+                  AND t.date BETWEEN ? AND ?
+                GROUP BY a.type
+            `);
+            const activities = stmtMoves.all(p.start, p.end);
+            return { period: p.label, activities };
+        });
 
-        const activities = stmtMoves.all(start, end);
-        res.json({ year, period: period || 'ANNUAL', activities });
+        res.json({ year, period, results });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 };
 
 exports.getFinancialTrends = (req, res) => {
-    const { type } = req.query; // 'ANNUAL', 'QUARTERLY', 'MONTHLY'
+    const { type } = req.query;
     const limit = type === 'MONTHLY' ? 12 : type === 'QUARTERLY' ? 8 : 5;
-
     try {
-        const periodFormat = type === 'MONTHLY' ?
-            `strftime('%Y-%m', t.date)` :
-            type === 'QUARTERLY' ?
-                `CASE 
+        const periodFormat = type === 'MONTHLY' ? `strftime('%Y-%m', t.date)` :
+            type === 'QUARTERLY' ? `CASE 
                 WHEN strftime('%m', t.date) BETWEEN '01' AND '03' THEN strftime('%Y', t.date) || '-Q1'
                 WHEN strftime('%m', t.date) BETWEEN '04' AND '06' THEN strftime('%Y', t.date) || '-Q2'
                 WHEN strftime('%m', t.date) BETWEEN '07' AND '09' THEN strftime('%Y', t.date) || '-Q3'
                 ELSE strftime('%Y', t.date) || '-Q4'
             END` : `strftime('%Y', t.date)`;
 
-        // 1. Get periods and basic movements
-        const stmtPeriods = db.prepare(`
-            SELECT 
-                ${periodFormat} as period,
-                MAX(t.date) as end_date,
-                SUM(CASE WHEN a.type = 'REVENUE' THEN je.credit - je.debit ELSE 0 END) as revenue,
-                SUM(CASE WHEN a.type = 'EXPENSE' THEN je.debit - je.credit ELSE 0 END) as expense,
-                SUM(CASE WHEN a.code LIKE '70%' THEN je.credit - je.debit ELSE 0 END) as sales,
-                SUM(CASE WHEN a.code LIKE '60%' THEN je.debit - je.credit ELSE 0 END) as cogs,
-                SUM(CASE WHEN a.type = 'REVENUE' AND a.code NOT LIKE '70%' THEN je.credit - je.debit ELSE 0 END) as other_revenue,
-                SUM(CASE WHEN a.type = 'EXPENSE' AND a.code NOT LIKE '60%' THEN je.debit - je.credit ELSE 0 END) as other_expense
-            FROM transactions t
-            JOIN journal_entries je ON t.id = je.transaction_id
-            JOIN accounts a ON je.account_id = a.id
-            GROUP BY period
-            ORDER BY period DESC
-            LIMIT ?
-        `);
+        const stmtPeriods = db.prepare(`SELECT ${periodFormat} as period, MAX(t.date) as end_date FROM transactions t GROUP BY period ORDER BY period DESC LIMIT ?`);
         const periods = stmtPeriods.all(limit).reverse();
-
-
-        // 2. Liquid accounts for Cash Flow
-        const stmtLiquidIds = db.prepare(`SELECT id FROM accounts WHERE code LIKE '57%'`);
-        const liquidIds = stmtLiquidIds.all().map(a => a.id);
-
-        // 3. For each period, calculate Cumulative Balance and Detailed Cash Flow
         const results = periods.map(p => {
-            // Absolute Balance Positions at end_date
-            const balance = db.prepare(`
-                SELECT 
-                    SUM(CASE WHEN a.type = 'ASSET' THEN je.debit - je.credit ELSE 0 END) as total_assets,
-                    SUM(CASE WHEN a.type = 'LIABILITY' THEN je.credit - je.debit ELSE 0 END) as total_liabilities,
-                    SUM(CASE WHEN a.type = 'EQUITY' THEN je.credit - je.debit ELSE 0 END) as total_equity
-                FROM journal_entries je
-                JOIN transactions t ON je.transaction_id = t.id
-                JOIN accounts a ON je.account_id = a.id
-                WHERE t.date <= ?
-            `).get(p.end_date);
-
-            // Detailed Cash Flow for this period
-            let cf = { op_cf: 0, inv_cf: 0, fin_cf: 0 };
-            if (liquidIds.length > 0) {
-                const stmtCF = db.prepare(`
-                    SELECT 
-                        SUM(CASE WHEN (oa.type IN ('REVENUE', 'EXPENSE') OR oa.code LIKE '4%' OR oa.code LIKE '56%') THEN je.debit - je.credit ELSE 0 END) as op_cf,
-                        SUM(CASE WHEN oa.code LIKE '2%' THEN je.debit - je.credit ELSE 0 END) as inv_cf,
-                        SUM(CASE WHEN (oa.code LIKE '1%' OR oa.code LIKE '17%' OR oa.code LIKE '52%') THEN je.debit - je.credit ELSE 0 END) as fin_cf
-                    FROM journal_entries je
-                    JOIN transactions t ON je.transaction_id = t.id
-                    JOIN journal_entries other ON t.id = other.transaction_id AND other.id != je.id
-                    JOIN accounts oa ON other.account_id = oa.id
-                    WHERE je.account_id IN (${liquidIds.join(',')})
-                      AND ${periodFormat} = ?
-                `);
-                cf = stmtCF.get(p.period);
-            }
-
-            return {
-                period: p.period,
-                revenue: p.revenue,
-                expense: p.expense,
-                gross_profit: p.sales - p.cogs,
-                operating_result: (p.sales - p.cogs) + (p.other_revenue - p.other_expense),
-                net_result: p.revenue - p.expense,
-                total_assets: balance.total_assets || 0,
-                total_liabilities: balance.total_liabilities || 0,
-                total_equity: (balance.total_assets || 0) - (balance.total_liabilities || 0), // Standard Net Worth
-                op_cf: cf.op_cf || 0,
-                inv_cf: cf.inv_cf || 0,
-                fin_cf: cf.fin_cf || 0,
-                fcf: (cf.op_cf || 0) + (cf.inv_cf || 0) // Free Cash Flow = Op + Inv (Inv is usually negative for Capex)
-            };
+            const balance = db.prepare(`SELECT 
+                SUM(CASE WHEN a.type = 'ASSET' THEN je.debit - je.credit ELSE 0 END) as total_assets,
+                SUM(CASE WHEN a.type = 'LIABILITY' THEN je.credit - je.debit ELSE 0 END) as total_liabilities
+                FROM journal_entries je JOIN transactions t ON je.transaction_id = t.id JOIN accounts a ON je.account_id = a.id WHERE t.date <= ?`).get(p.end_date);
+            return { period: p.period, total_assets: balance.total_assets || 0, total_liabilities: balance.total_liabilities || 0 };
         });
-
         res.json(results);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 };
 
 exports.getDashboardData = (req, res) => {
     try {
-        const stmtBalances = db.prepare(`
-           SELECT a.type, SUM(je.debit) as total_debit, SUM(je.credit) as total_credit
-           FROM accounts a
-           LEFT JOIN journal_entries je ON a.id = je.account_id
-           GROUP BY a.type
-        `);
+        const stmtBalances = db.prepare(`SELECT a.type, SUM(je.debit) as total_debit, SUM(je.credit) as total_credit FROM accounts a LEFT JOIN journal_entries je ON a.id = je.account_id GROUP BY a.type`);
         const balances = stmtBalances.all();
-
-        let assets = 0, liabilities = 0, equity = 0, revenue = 0, expenses = 0;
-
+        let assets = 0, liabilities = 0, revenue = 0, expenses = 0;
         balances.forEach(b => {
-            const netDr = (b.total_debit || 0) - (b.total_credit || 0);
-            const netCr = (b.total_credit || 0) - (b.total_debit || 0);
-
-            if (b.type === 'ASSET') assets += netDr;
-            else if (b.type === 'LIABILITY') liabilities += netCr;
-            else if (b.type === 'EQUITY') equity += netCr;
-            else if (b.type === 'REVENUE') revenue += netCr;
-            else if (b.type === 'EXPENSE') expenses += netDr;
+            if (b.type === 'ASSET') assets += (b.total_debit - b.total_credit);
+            else if (b.type === 'LIABILITY') liabilities += (b.total_credit - b.total_debit);
+            else if (b.type === 'REVENUE') revenue += (b.total_credit - b.total_debit);
+            else if (b.type === 'EXPENSE') expenses += (b.total_debit - b.total_credit);
         });
-
-        const netWorth = assets - liabilities;
-
-        const stmtMonthly = db.prepare(`
-            SELECT strftime('%Y-%m', t.date) as month, a.type, SUM(je.credit - je.debit) as net_amount
-            FROM transactions t
-            JOIN journal_entries je ON t.id = je.transaction_id
-            JOIN accounts a ON je.account_id = a.id
-            WHERE a.type IN ('REVENUE', 'EXPENSE') AND t.date >= date('now', '-12 months')
-            GROUP BY month, a.type
-            ORDER BY month ASC
-        `);
-
-        const monthlyData = stmtMonthly.all();
-        const months = [...new Set(monthlyData.map(m => m.month))];
-        const incomeData = months.map(m => {
-            const row = monthlyData.find(d => d.month === m && d.type === 'REVENUE');
-            return row ? row.net_amount : 0;
-        });
-        const expenseData = months.map(m => {
-            const row = monthlyData.find(d => d.month === m && d.type === 'EXPENSE');
-            return row ? Math.abs(row.net_amount) : 0;
-        });
-
-        res.json({
-            summary: {
-                netWorth,
-                assets,
-                liabilities,
-                netIncome: revenue - expenses
-            },
-            chart: {
-                labels: months,
-                income: incomeData,
-                expense: expenseData
-            }
-        });
-
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+        res.json({ summary: { netWorth: assets - liabilities, assets, liabilities, netIncome: revenue - expenses } });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 };

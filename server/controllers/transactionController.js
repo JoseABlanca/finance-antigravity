@@ -78,27 +78,35 @@ exports.updateTransaction = (req, res) => {
     }
 
     const updateTx = db.transaction(() => {
+        const numericId = parseInt(id);
+        console.log(`Attempting to update transaction ID: ${id} (numeric: ${numericId})`);
+
         // 1. Check if Transaction Exists
-        const txExists = db.prepare('SELECT 1 FROM transactions WHERE id = ?').get(id);
-        if (!txExists) throw new Error('Transaction not found');
+        const txExists = db.prepare('SELECT 1 FROM transactions WHERE id = ?').get(numericId);
+        if (!txExists) {
+            console.error(`Transaction with ID ${id} not found in database.`);
+            throw new Error('Transaction not found');
+        }
 
         // 2. Update Transaction Details
-        db.prepare('UPDATE transactions SET date = ?, description = ?, reference = ? WHERE id = ?')
-            .run(date, description, reference, id);
+        const info = db.prepare('UPDATE transactions SET date = ?, description = ?, reference = ? WHERE id = ?')
+            .run(date, description, reference || null, numericId);
+
+        console.log(`Transaction table update changes: ${info.changes}`);
 
         // 3. Delete Existing Journal Entries
-        const deleteEntries = db.prepare('DELETE FROM journal_entries WHERE transaction_id = ?');
-        deleteEntries.run(id);
+        db.prepare('DELETE FROM journal_entries WHERE transaction_id = ?').run(numericId);
 
-        // 3. Insert New Entries
+        // 4. Insert New Entries
         const stmtEntry = db.prepare('INSERT INTO journal_entries (transaction_id, account_id, debit, credit) VALUES (?, ?, ?, ?)');
         for (const entry of entries) {
-            stmtEntry.run(id, entry.account_id, entry.debit || 0, entry.credit || 0);
+            stmtEntry.run(numericId, entry.account_id, entry.debit || 0, entry.credit || 0);
         }
     });
 
     try {
         updateTx();
+        console.log(`Transaction ${id} updated successfully.`);
         res.json({ message: 'Transaction updated successfully' });
     } catch (err) {
         if (err.message === 'Transaction not found') {

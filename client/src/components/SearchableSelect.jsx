@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Search, X } from 'lucide-react';
 
-const SearchableSelect = ({ options, value, onChange, placeholder = "Select..." }) => {
+const SearchableSelect = ({ options, value, onChange, placeholder = "Select...", isMobile = false }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const wrapperRef = useRef(null);
@@ -42,7 +42,7 @@ const SearchableSelect = ({ options, value, onChange, placeholder = "Select..." 
                     }
                 }}
                 style={{
-                    padding: '8px 12px',
+                    padding: isMobile ? '4px 8px' : '8px 12px',
                     borderRadius: '8px',
                     border: '1px solid #ccc',
                     background: 'white',
@@ -50,7 +50,8 @@ const SearchableSelect = ({ options, value, onChange, placeholder = "Select..." 
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    minHeight: '38px'
+                    minHeight: isMobile ? '28px' : '38px',
+                    fontSize: isMobile ? '10px' : 'inherit'
                 }}
             >
                 <span style={{ color: selectedOption ? '#333' : '#999', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
@@ -87,7 +88,7 @@ const SearchableSelect = ({ options, value, onChange, placeholder = "Select..." 
                                 border: 'none',
                                 outline: 'none',
                                 width: '100%',
-                                fontSize: '13px'
+                                fontSize: isMobile ? '11px' : '13px'
                             }}
                             onClick={(e) => e.stopPropagation()} // Prevent closing when clicking input
                         />
@@ -112,9 +113,9 @@ const SearchableSelect = ({ options, value, onChange, placeholder = "Select..." 
                                     key={option.value}
                                     onClick={() => handleSelect(option)}
                                     style={{
-                                        padding: '8px 12px',
+                                        padding: isMobile ? '4px 8px' : '8px 12px',
                                         cursor: 'pointer',
-                                        fontSize: '13px',
+                                        fontSize: isMobile ? '10px' : '13px',
                                         borderBottom: '1px solid #f9f9f9',
                                         background: String(option.value) === String(value) ? '#f0f9ff' : 'white',
                                         color: String(option.value) === String(value) ? '#0066cc' : '#333'

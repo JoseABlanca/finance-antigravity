@@ -8,6 +8,7 @@ import SearchableSelect from '../components/SearchableSelect';
 const Journal = () => {
     const [searchParams] = useSearchParams();
     const codeParam = searchParams.get('code');
+    const isMobile = window.innerWidth < 768;
     const [transactions, setTransactions] = useState([]);
     const [accounts, setAccounts] = useState([]);
     const [showForm, setShowForm] = useState(false);
@@ -54,6 +55,20 @@ const Journal = () => {
         loadData();
     }, []);
 
+    const evaluateMathExpression = (expression) => {
+        if (!expression) return 0;
+        try {
+            // Sanitize: only allow numbers, math operators, parens, and dots
+            const sanitized = expression.toString().replace(/,/g, '.');
+            if (/[^0-9+\-*/().\s]/.test(sanitized)) return parseFloat(sanitized) || 0;
+            // eslint-disable-next-line no-new-func
+            const result = new Function(`return ${sanitized}`)();
+            return isNaN(result) ? 0 : Math.round(result * 100) / 100;
+        } catch {
+            return parseFloat(expression) || 0;
+        }
+    };
+
     const loadData = async () => {
         const [txRes, accRes] = await Promise.all([
             api.get('/transactions'),
@@ -67,6 +82,11 @@ const Journal = () => {
         const newLines = [...lines];
         newLines[index][field] = value;
         setLines(newLines);
+    };
+
+    const handleMathBlur = (index, field, value) => {
+        const evaluated = evaluateMathExpression(value);
+        handleLineChange(index, field, evaluated);
     };
 
     const addLine = () => {
@@ -170,6 +190,7 @@ const Journal = () => {
         const isIncluded = (field, value) => {
             const selected = selectedValues[field];
             if (!selected || selected.length === 0) return true;
+            if (selected.includes('__EMPTY__')) return false;
             return selected.includes(String(value));
         };
 
@@ -268,19 +289,27 @@ const Journal = () => {
         const handleToggle = (val) => {
             let newSelected = [...currentSelected];
             if (newSelected.length === 0) {
-                // If nothing was explicitly selected, it meant all were "selected" by default.
-                // To toggle one OFF, we actually need to select all EXCEPT that one.
+                // All were selected by default. Deselecting one means selecting all others.
                 newSelected = uniqueValues.filter(v => v !== val);
+            } else if (newSelected.includes('__EMPTY__')) {
+                // None were selected. Selecting one makes it the only one.
+                newSelected = [val];
             } else if (newSelected.includes(val)) {
                 newSelected = newSelected.filter(v => v !== val);
+                if (newSelected.length === 0) newSelected = ['__EMPTY__'];
             } else {
                 newSelected.push(val);
+                if (newSelected.length === uniqueValues.length) newSelected = [];
             }
             setSelectedValues({ ...selectedValues, [field]: newSelected });
         };
 
         const handleSelectAll = () => {
-            setSelectedValues({ ...selectedValues, [field]: [] }); // Empty means all in my logic
+            if (isAllSelected) {
+                setSelectedValues({ ...selectedValues, [field]: ['__EMPTY__'] });
+            } else {
+                setSelectedValues({ ...selectedValues, [field]: [] });
+            }
         };
 
         const filteredUniqueValues = uniqueValues.filter(v =>
@@ -329,7 +358,7 @@ const Journal = () => {
                                 <label key={val} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px', cursor: 'pointer', fontSize: '12px' }}>
                                     <input
                                         type="checkbox"
-                                        checked={currentSelected.length === 0 || currentSelected.includes(val)}
+                                        checked={currentSelected.length === 0 || (currentSelected.includes(val) && !currentSelected.includes('__EMPTY__'))}
                                         onChange={() => handleToggle(val)}
                                     />
                                     {val}
@@ -404,22 +433,22 @@ const Journal = () => {
                     <form onSubmit={handleSubmit}>
                         <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
                             <div className="input-group" style={{ flex: 1 }}>
-                                <label>Fecha</label>
-                                <input type="date" value={date} onChange={e => setDate(e.target.value)} required />
+                                <label style={{ fontSize: isMobile ? '10px' : 'inherit' }}>Fecha</label>
+                                <input type="date" value={date} onChange={e => setDate(e.target.value)} required style={{ fontSize: isMobile ? '11px' : 'inherit', padding: isMobile ? '4px' : '8px' }} />
                             </div>
                             <div className="input-group" style={{ flex: 3 }}>
-                                <label>Descripción / Concepto</label>
-                                <input value={description} onChange={e => setDescription(e.target.value)} placeholder="ej. Pago Alquiler (Opcional)" />
+                                <label style={{ fontSize: isMobile ? '10px' : 'inherit' }}>Descripción / Concepto</label>
+                                <input value={description} onChange={e => setDescription(e.target.value)} placeholder="ej. Pago Alquiler (Opcional)" style={{ fontSize: isMobile ? '11px' : 'inherit', padding: isMobile ? '4px' : '8px' }} />
                             </div>
                         </div>
 
                         <table style={{ width: '100%', marginBottom: '16px' }}>
                             <thead>
-                                <tr>
+                                <tr style={{ fontSize: isMobile ? '10px' : 'inherit' }}>
                                     <th>Cuenta</th>
-                                    <th width="150">Debe</th>
-                                    <th width="150">Haber</th>
-                                    <th width="50"></th>
+                                    <th width={isMobile ? "80" : "150"}>Debe</th>
+                                    <th width={isMobile ? "80" : "150"}>Haber</th>
+                                    <th width="40"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -434,20 +463,25 @@ const Journal = () => {
                                                 value={line.account_id}
                                                 onChange={(val) => handleLineChange(idx, 'account_id', val)}
                                                 placeholder="Seleccionar Cuenta..."
+                                                isMobile={isMobile}
                                             />
                                         </td>
                                         <td>
                                             <input
-                                                type="number" step="0.01" style={{ width: '100%', padding: '8px' }}
+                                                type="text" style={{ width: '100%', padding: isMobile ? '4px' : '8px', fontSize: isMobile ? '10px' : 'inherit' }}
                                                 value={line.debit}
-                                                onChange={e => handleLineChange(idx, 'debit', parseFloat(e.target.value) || 0)}
+                                                onChange={e => handleLineChange(idx, 'debit', e.target.value)}
+                                                onBlur={e => handleMathBlur(idx, 'debit', e.target.value)}
+                                                onKeyDown={e => e.key === 'Enter' && handleMathBlur(idx, 'debit', e.target.value)}
                                             />
                                         </td>
                                         <td>
                                             <input
-                                                type="number" step="0.01" style={{ width: '100%', padding: '8px' }}
+                                                type="text" style={{ width: '100%', padding: isMobile ? '4px' : '8px', fontSize: isMobile ? '10px' : 'inherit' }}
                                                 value={line.credit}
-                                                onChange={e => handleLineChange(idx, 'credit', parseFloat(e.target.value) || 0)}
+                                                onChange={e => handleLineChange(idx, 'credit', e.target.value)}
+                                                onBlur={e => handleMathBlur(idx, 'credit', e.target.value)}
+                                                onKeyDown={e => e.key === 'Enter' && handleMathBlur(idx, 'credit', e.target.value)}
                                             />
                                         </td>
                                         <td>
@@ -459,9 +493,9 @@ const Journal = () => {
                                 ))}
                             </tbody>
                             <tfoot>
-                                <tr style={{ borderTop: '2px solid #ddd', fontWeight: 'bold' }}>
-                                    <td style={{ textAlign: 'right', padding: '8px' }}>Totales:</td>
-                                    <td style={{ padding: '8px', color: isBalanced ? 'green' : (imbalance < 0 ? 'red' : 'inherit') }}>
+                                <tr style={{ borderTop: '2px solid #ddd', fontWeight: 'bold', fontSize: isMobile ? '10px' : 'inherit' }}>
+                                    <td style={{ textAlign: 'right', padding: isMobile ? '4px' : '8px' }}>Totales:</td>
+                                    <td style={{ padding: isMobile ? '4px' : '8px', color: isBalanced ? 'green' : (imbalance < 0 ? 'red' : 'inherit') }}>
                                         {totalDebit.toFixed(2)}
                                         {!isBalanced && imbalance < 0 && (
                                             <div style={{ fontSize: '11px', color: 'red', marginTop: '4px' }}>
@@ -469,7 +503,7 @@ const Journal = () => {
                                             </div>
                                         )}
                                     </td>
-                                    <td style={{ padding: '8px', color: isBalanced ? 'green' : (imbalance > 0 ? 'red' : 'inherit') }}>
+                                    <td style={{ padding: isMobile ? '4px' : '8px', color: isBalanced ? 'green' : (imbalance > 0 ? 'red' : 'inherit') }}>
                                         {totalCredit.toFixed(2)}
                                         {!isBalanced && imbalance > 0 && (
                                             <div style={{ fontSize: '11px', color: 'red', marginTop: '4px' }}>
@@ -481,11 +515,11 @@ const Journal = () => {
                                 </tr>
                             </tfoot>
                         </table>
-                        <button type="button" onClick={addLine} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', marginBottom: '16px' }}>+ Añadir Línea</button>
+                        <button type="button" onClick={addLine} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', marginBottom: '16px', fontSize: isMobile ? '11px' : 'inherit' }}>+ Añadir Línea</button>
 
                         <div style={{ textAlign: 'right' }}>
-                            <button type="button" className="btn btn-secondary" onClick={() => { setShowForm(false); setEditingId(null); }} style={{ marginRight: '12px' }}>Cancelar</button>
-                            <button type="submit" className="btn">{editingId ? 'Actualizar' : 'Contabilizar'}</button>
+                            <button type="button" className="btn btn-secondary" onClick={() => { setShowForm(false); setEditingId(null); }} style={{ marginRight: '12px', fontSize: isMobile ? '12px' : 'inherit', padding: isMobile ? '4px 12px' : 'inherit' }}>Cancelar</button>
+                            <button type="submit" className="btn" style={{ fontSize: isMobile ? '12px' : 'inherit', padding: isMobile ? '4px 12px' : 'inherit' }}>{editingId ? 'Actualizar' : 'Contabilizar'}</button>
                         </div>
                     </form>
                 </div>
@@ -494,14 +528,14 @@ const Journal = () => {
             <div className="card" style={{ marginBottom: '24px' }}>
                 <h3 style={{ marginBottom: '16px' }}>Resumen Diario (Cuadre)</h3>
                 <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: isMobile ? '10px' : '13px' }}>
                         <thead>
                             <tr style={{ background: '#f8f9fa', borderBottom: '2px solid #eee' }}>
-                                <th style={{ padding: '8px', textAlign: 'left' }}>Fecha</th>
-                                <th style={{ padding: '8px', textAlign: 'right' }}>Total Debe</th>
-                                <th style={{ padding: '8px', textAlign: 'right' }}>Total Haber</th>
-                                <th style={{ padding: '8px', textAlign: 'center' }}>Diferencia</th>
-                                <th style={{ padding: '8px', textAlign: 'center' }}>Estado</th>
+                                <th style={{ padding: isMobile ? '4px' : '8px', textAlign: 'left' }}>Fecha</th>
+                                <th style={{ padding: isMobile ? '4px' : '8px', textAlign: 'right' }}>Debe</th>
+                                <th style={{ padding: isMobile ? '4px' : '8px', textAlign: 'right' }}>Haber</th>
+                                <th style={{ padding: isMobile ? '4px' : '8px', textAlign: 'right' }}>Dif.</th>
+                                <th style={{ padding: isMobile ? '4px' : '8px', textAlign: 'center' }}>Estado</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -511,23 +545,24 @@ const Journal = () => {
                                 let statusLabel = "CUADRE";
                                 let statusColor = "#059669"; // Green
 
-                                if (diff > 0.01) {
+                                if (!isDayBalanced) {
                                     statusLabel = "Saldo Deudor";
                                     statusColor = "#dc2626"; // Red
-                                } else if (diff < -0.01) {
+                                }
+                                if (diff < -0.01) {
                                     statusLabel = "Saldo Acreedor";
                                     statusColor = "#dc2626"; // Red
                                 }
 
                                 return (
                                     <tr key={day.date} style={{ borderBottom: '1px solid #eee' }}>
-                                        <td style={{ padding: '8px' }}>{format(new Date(day.date), 'dd/MM/yyyy')}</td>
-                                        <td style={{ padding: '8px', textAlign: 'right' }}>€{day.debit.toLocaleString('de-DE', { minimumFractionDigits: 2 })}</td>
-                                        <td style={{ padding: '8px', textAlign: 'right' }}>€{day.credit.toLocaleString('de-DE', { minimumFractionDigits: 2 })}</td>
-                                        <td style={{ padding: '8px', textAlign: 'right', color: isDayBalanced ? '#666' : '#dc2626', fontWeight: isDayBalanced ? 'normal' : 'bold' }}>
+                                        <td style={{ padding: isMobile ? '4px' : '8px' }}>{format(new Date(day.date), 'dd/MM/yyyy')}</td>
+                                        <td style={{ padding: isMobile ? '4px' : '8px', textAlign: 'right' }}>€{day.debit.toLocaleString('de-DE', { minimumFractionDigits: 2 })}</td>
+                                        <td style={{ padding: isMobile ? '4px' : '8px', textAlign: 'right' }}>€{day.credit.toLocaleString('de-DE', { minimumFractionDigits: 2 })}</td>
+                                        <td style={{ padding: isMobile ? '4px' : '8px', textAlign: 'right', color: isDayBalanced ? '#666' : '#dc2626', fontWeight: isDayBalanced ? 'normal' : 'bold' }}>
                                             {isDayBalanced ? '-' : `€${Math.abs(diff).toLocaleString('de-DE', { minimumFractionDigits: 2 })}`}
                                         </td>
-                                        <td style={{ padding: '8px', textAlign: 'center' }}>
+                                        <td style={{ padding: isMobile ? '4px' : '8px', textAlign: 'center' }}>
                                             <span style={{ color: statusColor, fontWeight: 'bold' }}>{statusLabel}</span>
                                         </td>
                                     </tr>
@@ -560,11 +595,11 @@ const Journal = () => {
                 </div>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
-                        <tr style={{ textAlign: 'left', borderBottom: '2px solid #ddd', background: '#f8f9fa' }}>
-                            <th style={{ padding: '12px', border: '1px solid #ddd', width: '60px' }}>
+                        <tr style={{ textAlign: 'left', borderBottom: '2px solid #ddd', background: '#f8f9fa', fontSize: isMobile ? '10px' : 'inherit' }}>
+                            <th style={{ padding: isMobile ? '4px' : '12px', border: '1px solid #ddd', width: isMobile ? '40px' : '60px' }}>
                                 <ExcelFilter title="ID" field="id" entryField="txId" />
                             </th>
-                            <th style={{ padding: '12px', border: '1px solid #ddd', width: '120px' }}>
+                            <th style={{ padding: isMobile ? '4px' : '12px', border: '1px solid #ddd', width: isMobile ? '80px' : '120px' }}>
                                 <FilterDropdown title="Fecha" field="date" value={filterDateStart || filterDateEnd}>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                         <div>
@@ -578,50 +613,50 @@ const Journal = () => {
                                     </div>
                                 </FilterDropdown>
                             </th>
-                            <th style={{ padding: '12px', border: '1px solid #ddd' }}>
+                            <th style={{ padding: isMobile ? '4px' : '12px', border: '1px solid #ddd' }}>
                                 <ExcelFilter title="Concepto" field="desc" entryField="txDescription" />
                             </th>
-                            <th style={{ padding: '12px', border: '1px solid #ddd', width: '90px' }}>
+                            <th style={{ padding: isMobile ? '4px' : '12px', border: '1px solid #ddd', width: isMobile ? '60px' : '90px' }}>
                                 <ExcelFilter title="Cód. Cuenta" field="parentCode" entryField="parentAccountCode" />
                             </th>
-                            <th style={{ padding: '12px', border: '1px solid #ddd' }}>
+                            <th style={{ padding: isMobile ? '4px' : '12px', border: '1px solid #ddd' }}>
                                 <ExcelFilter title="Cuenta" field="parentName" entryField="parentAccountName" />
                             </th>
-                            <th style={{ padding: '12px', border: '1px solid #ddd', width: '90px' }}>
+                            <th style={{ padding: isMobile ? '4px' : '12px', border: '1px solid #ddd', width: isMobile ? '60px' : '90px' }}>
                                 <ExcelFilter title="Cód. Subcu." field="code" entryField="accountCode" />
                             </th>
-                            <th style={{ padding: '12px', border: '1px solid #ddd' }}>
+                            <th style={{ padding: isMobile ? '4px' : '12px', border: '1px solid #ddd' }}>
                                 <ExcelFilter title="Subcuenta" field="subName" entryField="accountName" />
                             </th>
-                            <th style={{ padding: '12px', textAlign: 'right', border: '1px solid #ddd', width: '110px' }}>Debe</th>
-                            <th style={{ padding: '12px', textAlign: 'right', border: '1px solid #ddd', width: '110px' }}>Haber</th>
-                            <th style={{ padding: '12px', border: '1px solid #ddd', width: '100px', textAlign: 'center' }}>Acciones</th>
+                            <th style={{ padding: isMobile ? '4px' : '12px', textAlign: 'right', border: '1px solid #ddd', width: isMobile ? '70px' : '110px' }}>Debe</th>
+                            <th style={{ padding: isMobile ? '4px' : '12px', textAlign: 'right', border: '1px solid #ddd', width: isMobile ? '70px' : '110px' }}>Haber</th>
+                            <th style={{ padding: isMobile ? '4px' : '12px', border: '1px solid #ddd', width: isMobile ? '60px' : '100px', textAlign: 'center' }}>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         {finalEntries.map((entry, idx) => {
                             const isFirstOfTx = idx === 0 || finalEntries[idx - 1].txId !== entry.txId;
                             return (
-                                <tr key={`${entry.txId}-${entry.account_id}-${idx}`} style={{ borderBottom: '1px solid #ddd' }}>
-                                    <td style={{ padding: '8px 12px', textAlign: 'center', color: '#666', fontSize: '13px', borderLeft: '1px solid #ddd', borderRight: '1px solid #ddd', fontWeight: isFirstOfTx ? 'bold' : 'normal', borderTop: isFirstOfTx ? '1px solid #ddd' : 'none' }}>
+                                <tr key={`${entry.txId}-${entry.account_id}-${idx}`} style={{ borderBottom: '1px solid #ddd', fontSize: isMobile ? '10px' : '13px' }}>
+                                    <td style={{ padding: isMobile ? '4px' : '8px 12px', textAlign: 'center', color: '#666', borderLeft: '1px solid #ddd', borderRight: '1px solid #ddd', fontWeight: isFirstOfTx ? 'bold' : 'normal', borderTop: isFirstOfTx ? '1px solid #ddd' : 'none' }}>
                                         {entry.displayTxId}
                                     </td>
-                                    <td style={{ padding: '8px 12px', color: '#555', fontSize: '13px', border: '1px solid #ddd' }}>
+                                    <td style={{ padding: isMobile ? '4px' : '8px 12px', color: '#555', border: '1px solid #ddd' }}>
                                         {format(new Date(entry.txDate), 'dd/MM/yyyy')}
                                     </td>
-                                    <td style={{ padding: '8px 12px', color: '#333', border: '1px solid #ddd', fontSize: '13px' }}>
+                                    <td style={{ padding: isMobile ? '4px' : '8px 12px', color: '#333', border: '1px solid #ddd' }}>
                                         {entry.txDescription}
                                     </td>
-                                    <td style={{ padding: '8px 12px', color: '#666', border: '1px solid #ddd', fontSize: '13px' }}>
+                                    <td style={{ padding: isMobile ? '4px' : '8px 12px', color: '#666', border: '1px solid #ddd' }}>
                                         {entry.parentAccountCode}
                                     </td>
-                                    <td style={{ padding: '8px 12px', border: '1px solid #ddd', fontSize: '13px', fontWeight: '500' }}>
+                                    <td style={{ padding: isMobile ? '4px' : '8px 12px', border: '1px solid #ddd', fontWeight: '500' }}>
                                         {entry.parentAccountName}
                                     </td>
-                                    <td style={{ padding: '8px 12px', color: '#666', border: '1px solid #ddd', fontSize: '13px' }}>
+                                    <td style={{ padding: isMobile ? '4px' : '8px 12px', color: '#666', border: '1px solid #ddd' }}>
                                         {entry.accountCode}
                                     </td>
-                                    <td style={{ padding: '8px 12px', border: '1px solid #ddd', fontSize: '13px' }}>
+                                    <td style={{ padding: isMobile ? '4px' : '8px 12px', border: '1px solid #ddd' }}>
                                         {entry.accountName}
                                     </td>
                                     <td style={{ padding: '8px 12px', textAlign: 'right', border: '1px solid #ddd', fontSize: '13px' }}>

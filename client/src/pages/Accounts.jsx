@@ -12,54 +12,53 @@ const AccountItem = ({ account, level, onAddChild, onDelete, onEdit, onViewDetai
         <div className="account-item">
             <div
                 className="account-row"
-                style={{ paddingLeft: `${level * 20 + 12}px` }}
+                style={{ paddingLeft: `${level * (isMobile ? 4 : 20) + (isMobile ? 2 : 12)}px`, paddingRight: isMobile ? '2px' : '12px', minHeight: isMobile ? '24px' : '48px' }}
             >
                 <div
                     className="expand-icon"
                     onClick={() => toggleExpand(account.id)}
-                    style={{ visibility: hasChildren ? 'visible' : 'hidden', cursor: 'pointer', marginRight: '8px' }}
+                    style={{ visibility: hasChildren ? 'visible' : 'hidden', cursor: 'pointer', marginRight: isMobile ? '2px' : '8px' }}
                 >
-                    {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    {isExpanded ? <ChevronDown size={isMobile ? 14 : 16} /> : <ChevronRight size={isMobile ? 14 : 16} />}
                 </div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? '2px' : '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', width: isMobile ? '100%' : 'auto' }}>
-                        <span style={{ fontWeight: 600, marginRight: '8px', color: '#555', fontSize: isMobile ? '12px' : 'inherit' }}>{account.code}</span>
-                        <span style={{ fontWeight: 500, fontSize: isMobile ? '13px' : 'inherit' }}>{account.name}</span>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: isMobile ? '1px' : '8px', overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflow: 'hidden' }}>
+                        <span style={{ fontWeight: 600, marginRight: '2px', color: '#555', fontSize: isMobile ? '8px' : 'inherit', whiteSpace: 'nowrap' }}>{account.code}</span>
+                        <span style={{ fontWeight: 500, fontSize: isMobile ? '9px' : 'inherit', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{account.name}</span>
                     </div>
 
                     <div style={{
-                        marginLeft: isMobile ? '0' : 'auto',
+                        marginLeft: 'auto',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: isMobile ? 'space-between' : 'flex-end',
-                        width: isMobile ? '100%' : 'auto'
+                        gap: isMobile ? '2px' : '12px'
                     }}>
-                        <span style={{ fontWeight: 600, color: '#333', fontSize: isMobile ? '12px' : 'inherit' }}>
+                        <span style={{ fontWeight: 600, color: '#333', fontSize: isMobile ? '9px' : 'inherit', whiteSpace: 'nowrap' }}>
                             {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(account.totalBalance || 0)}
                         </span>
-                        <span className={`badge badge-${account.type.toLowerCase()}`} style={{ marginLeft: '12px', fontSize: '9px', padding: '2px 4px' }}>
-                            {account.type}
-                        </span>
+                        {!isMobile && (
+                            <span className={`badge badge-${account.type.toLowerCase()}`} style={{ fontSize: '9px', padding: '2px 4px' }}>
+                                {account.type}
+                            </span>
+                        )}
                     </div>
 
                     <div className="actions" style={{
                         display: 'flex',
-                        marginLeft: isMobile ? '0' : '8px',
-                        width: isMobile ? '100%' : 'auto',
-                        justifyContent: isMobile ? 'flex-end' : 'flex-start',
-                        marginTop: isMobile ? '2px' : '0'
+                        gap: isMobile ? '0px' : '2px',
+                        alignItems: 'center'
                     }}>
-                        <button className="btn-icon" onClick={() => onViewDetails(account)} title="Ver movimientos">
-                            <Eye size={isMobile ? 14 : 16} />
+                        <button className="btn-icon" style={{ padding: isMobile ? '0px' : '4px' }} onClick={() => onViewDetails(account)} title="Ver movimientos">
+                            <Eye size={isMobile ? 10 : 16} />
                         </button>
-                        <button className="btn-icon" onClick={() => onEdit(account)}>
-                            <Pencil size={isMobile ? 14 : 16} />
+                        <button className="btn-icon" style={{ padding: isMobile ? '0px' : '4px' }} onClick={() => onEdit(account)}>
+                            <Pencil size={isMobile ? 10 : 16} />
                         </button>
-                        <button className="btn-icon" onClick={() => onAddChild(account)}>
-                            <Plus size={isMobile ? 14 : 16} />
+                        <button className="btn-icon" style={{ padding: isMobile ? '0px' : '4px' }} onClick={() => onAddChild(account)}>
+                            <Plus size={isMobile ? 10 : 16} />
                         </button>
-                        <button className="btn-icon danger" onClick={() => onDelete(account.id)}>
-                            <Trash2 size={isMobile ? 14 : 16} />
+                        <button className="btn-icon danger" style={{ padding: isMobile ? '0px' : '4px' }} onClick={() => onDelete(account.id)}>
+                            <Trash2 size={isMobile ? 10 : 16} />
                         </button>
                     </div>
                 </div>
