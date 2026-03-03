@@ -123,20 +123,6 @@ exports.sendReport = async (req, res) => {
                 <div style="padding: 24px;">
                     <p>Hola,</p>
                     <p>Aquí tienes el resumen de tu estado financiero actual generado desde <strong>FinancePro</strong>.</p>
-                    <div style="display: flex; gap: 16px; margin: 24px 0;">
-                        <div style="flex: 1; padding: 16px; background: #f5f5f5; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 12px; text-transform: uppercase; color: #666; font-weight: bold;">Patrimonio Neto</div>
-                            <div style="font-size: 24px; font-weight: bold; color: #1a237e; margin-top: 8px;">
-                                ${new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(netWorth)}
-                            </div>
-                        </div>
-                        <div style="flex: 1; padding: 16px; background: #f5f5f5; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 12px; text-transform: uppercase; color: #666; font-weight: bold;">Resultado Neto</div>
-                            <div style="font-size: 24px; font-weight: bold; color: ${netIncome >= 0 ? '#2e7d32' : '#c62828'}; margin-top: 8px;">
-                                ${new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(netIncome)}
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>`;
         const result = await sendEmail(email, 'Tu Reporte Financiero Personal', html);
@@ -152,9 +138,9 @@ exports.getBalanceSheet = (req, res) => {
         let periods = [];
         if (comparison === 'custom') {
             const customRange = {
-                from: { year: parseInt(req.query.fromYear), month: parseInt(req.query.fromMonth) },
-                to: { year: parseInt(req.query.toYear), month: parseInt(req.query.toMonth) },
-                type: 'MONTHLY'
+                from: { year: parseInt(req.query.fromYear), month: parseInt(req.query.fromMonth || '01') },
+                to: { year: parseInt(req.query.toYear), month: parseInt(req.query.toMonth || '12') },
+                type: period === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY'
             };
             periods = getComparisonPeriods(year, period, 1, customRange);
         } else if (comparison === 'true') {
@@ -200,9 +186,9 @@ exports.getProfitAndLoss = (req, res) => {
         let periods = [];
         if (comparison === 'custom') {
             const customRange = {
-                from: { year: parseInt(req.query.fromYear), month: parseInt(req.query.fromMonth) },
-                to: { year: parseInt(req.query.toYear), month: parseInt(req.query.toMonth) },
-                type: 'MONTHLY'
+                from: { year: parseInt(req.query.fromYear), month: parseInt(req.query.fromMonth || '01') },
+                to: { year: parseInt(req.query.toYear), month: parseInt(req.query.toMonth || '12') },
+                type: period === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY'
             };
             periods = getComparisonPeriods(year, period, 1, customRange);
         } else if (comparison === 'true') {
@@ -244,9 +230,9 @@ exports.getCashFlow = (req, res) => {
         let periods = [];
         if (comparison === 'custom') {
             const customRange = {
-                from: { year: parseInt(req.query.fromYear), month: parseInt(req.query.fromMonth) },
-                to: { year: parseInt(req.query.toYear), month: parseInt(req.query.toMonth) },
-                type: 'MONTHLY'
+                from: { year: parseInt(req.query.fromYear), month: parseInt(req.query.fromMonth || '01') },
+                to: { year: parseInt(req.query.toYear), month: parseInt(req.query.toMonth || '12') },
+                type: period === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY'
             };
             periods = getComparisonPeriods(year, period, 1, customRange);
         } else if (comparison === 'true') {

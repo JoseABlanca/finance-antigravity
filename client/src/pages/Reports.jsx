@@ -140,7 +140,8 @@ const Reports = () => {
                                         <td key={i} style={{
                                             padding: '12px', textAlign: 'right', fontWeight: 'bold',
                                             color: getCategoryValue(res, cat) >= 0 ? '#2e7d32' : '#c62828',
-                                            fontSize: isMobile ? '0.7rem' : '1rem'
+                                            fontSize: isMobile ? '0.7rem' : '1rem',
+                                            whiteSpace: 'nowrap'
                                         }}>
                                             {formatCurrency(getCategoryValue(res, cat)).replace('€', '').trim()}
                                         </td>
@@ -316,7 +317,7 @@ const Reports = () => {
                                     <td key={i} style={{
                                         padding: '12px', textAlign: 'right', fontWeight: '900',
                                         fontSize: isMobile ? '0.75rem' : '1.2rem', color: '#1a237e',
-                                        borderBottom: '2px solid #eee'
+                                        borderBottom: '2px solid #eee', whiteSpace: 'nowrap'
                                     }}>
                                         {formatCurrency(total).replace('€', '').trim()}
                                     </td>
@@ -354,7 +355,7 @@ const Reports = () => {
                                     TOTAL {groups[type]}
                                 </td>
                                 {sectionTotals.map((total, i) => (
-                                    <td key={i} style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', fontSize: isMobile ? '0.8rem' : '1.1rem' }}>
+                                    <td key={i} style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', fontSize: isMobile ? '0.8rem' : '1.1rem', whiteSpace: 'nowrap' }}>
                                         {formatCurrency(total)}
                                     </td>
                                 ))}
@@ -460,17 +461,21 @@ const Reports = () => {
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ fontSize: '12px', fontWeight: '900', color: '#666', textTransform: 'uppercase' }}>Desde:</span>
-                            <select value={fromMonth} onChange={(e) => setFromMonth(e.target.value)} style={{ padding: '6px', borderRadius: '6px', border: '1px solid #ddd' }}>
-                                {["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"].map(m => <option key={m} value={m}>{m}</option>)}
-                            </select>
-                            <input type="number" value={fromYear} onChange={(e) => setFromYear(parseInt(e.target.value))} style={{ width: '70px', padding: '6px', borderRadius: '6px', border: '1px solid #ddd' }} />
+                            {period !== 'ANNUAL' && (
+                                <select value={fromMonth} onChange={(e) => setFromMonth(e.target.value)} style={{ padding: '6px', borderRadius: '6px', border: '1px solid #ddd' }}>
+                                    {["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"].map(m => <option key={m} value={m}>{m}</option>)}
+                                </select>
+                            )}
+                            <input type="number" value={fromYear} onChange={(e) => setFromYear(parseInt(e.target.value))} style={{ width: '80px', padding: '6px', borderRadius: '6px', border: '1px solid #ddd' }} />
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ fontSize: '12px', fontWeight: '900', color: '#666', textTransform: 'uppercase' }}>Hasta:</span>
-                            <select value={toMonth} onChange={(e) => setToMonth(e.target.value)} style={{ padding: '6px', borderRadius: '6px', border: '1px solid #ddd' }}>
-                                {["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"].map(m => <option key={m} value={m}>{m}</option>)}
-                            </select>
-                            <input type="number" value={toYear} onChange={(e) => setToYear(parseInt(e.target.value))} style={{ width: '70px', padding: '6px', borderRadius: '6px', border: '1px solid #ddd' }} />
+                            {period !== 'ANNUAL' && (
+                                <select value={toMonth} onChange={(e) => setToMonth(e.target.value)} style={{ padding: '6px', borderRadius: '6px', border: '1px solid #ddd' }}>
+                                    {["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"].map(m => <option key={m} value={m}>{m}</option>)}
+                                </select>
+                            )}
+                            <input type="number" value={toYear} onChange={(e) => setToYear(parseInt(e.target.value))} style={{ width: '80px', padding: '6px', borderRadius: '6px', border: '1px solid #ddd' }} />
                         </div>
                         <button
                             onClick={setRangeToStart}
