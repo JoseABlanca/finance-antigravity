@@ -67,7 +67,9 @@ const QuantReport = () => {
     const [wfTab, setWfTab] = useState('analysis'); // 'analysis', 'matrix'
     const [wfMatrixData, setWfMatrixData] = useState(null);
     const [wfMatrixLoading, setWfMatrixLoading] = useState(false);
+    const [wfMatrixRebalanceType, setWfMatrixRebalanceType] = useState('months');
     const [wfMatrixRebalanceRange, setWfMatrixRebalanceRange] = useState({ from: 1, to: 12, step: 1 });
+    const [wfMatrixAssetsRange, setWfMatrixAssetsRange] = useState({ from: 0, to: 2, step: 1 });
     const [wfMatrixMetric, setWfMatrixMetric] = useState('sharpe');
 
     // Monte Carlo State
@@ -1744,7 +1746,8 @@ const QuantReport = () => {
                                                                     size: 3,
                                                                     line: { color: 'white', width: 0.5 }
                                                                 },
-                                                                diagonal: { visible: false }
+                                                                diagonal: { visible: false },
+                                                                showupperhalf: false
                                                             }]}
                                                             layout={{
                                                                 autosize: true,
@@ -1848,8 +1851,8 @@ const QuantReport = () => {
                                                                 labels: walkforwardData.dates || [],
                                                                 datasets: [
                                                                     {
-                                                                        label: 'Equity Rebalanceo',
-                                                                        data: walkforwardData.portfolioEquity || [],
+                                                                        label: 'Equity Rebalanceo (%)',
+                                                                        data: walkforwardData.portfolioEquity?.map(v => ((v - 10000) / 10000) * 100) || [],
                                                                         borderColor: '#1e88e5',
                                                                         backgroundColor: 'rgba(30, 136, 229, 0.1)',
                                                                         fill: true,
@@ -1858,8 +1861,8 @@ const QuantReport = () => {
                                                                         tension: 0.1
                                                                     },
                                                                     {
-                                                                        label: 'Cartera Estática',
-                                                                        data: walkforwardData.staticEquity || [],
+                                                                        label: 'Cartera Estática (%)',
+                                                                        data: walkforwardData.staticEquity?.map(v => ((v - 10000) / 10000) * 100) || [],
                                                                         borderColor: '#9333ea',
                                                                         backgroundColor: 'transparent',
                                                                         fill: false,
@@ -1868,8 +1871,8 @@ const QuantReport = () => {
                                                                         tension: 0.1
                                                                     },
                                                                     {
-                                                                        label: 'Benchmark (SPY)',
-                                                                        data: walkforwardData.benchmarkEquity || [],
+                                                                        label: 'Benchmark SPY (%)',
+                                                                        data: walkforwardData.benchmarkEquity?.map(v => ((v - walkforwardData.benchmarkEquity[0]) / walkforwardData.benchmarkEquity[0]) * 100) || [],
                                                                         borderColor: '#9ca3af',
                                                                         backgroundColor: 'transparent',
                                                                         fill: false,
@@ -1879,9 +1882,9 @@ const QuantReport = () => {
                                                                         tension: 0.1
                                                                     },
                                                                     {
-                                                                        label: 'Activo Base (EW - No Optimizado)',
-                                                                        data: walkforwardData.baselineEquity || [],
-                                                                        borderColor: '#10b981',
+                                                                        label: 'Baseline Equi-Weight (%)',
+                                                                        data: walkforwardData.baselineEquity?.map(v => ((v - 10000) / 10000) * 100) || [],
+                                                                        borderColor: '#f59e0b',
                                                                         backgroundColor: 'transparent',
                                                                         fill: false,
                                                                         borderWidth: 1.5,
@@ -1893,8 +1896,23 @@ const QuantReport = () => {
                                                             options={{
                                                                 responsive: true,
                                                                 maintainAspectRatio: false,
-                                                                plugins: { legend: { display: true }, tooltip: { mode: 'index', intersect: false } },
-                                                                scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } }, y: { grid: { color: '#f5f5f5' } } }
+                                                                plugins: {
+                                                                    legend: { display: true },
+                                                                    tooltip: {
+                                                                        mode: 'index',
+                                                                        intersect: false,
+                                                                        callbacks: {
+                                                                            label: (ctx) => `${ctx.dataset.label.replace(' (%)', '')}: ${ctx.raw.toFixed(2)}%`
+                                                                        }
+                                                                    }
+                                                                },
+                                                                scales: {
+                                                                    x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
+                                                                    y: {
+                                                                        grid: { color: '#f5f5f5' },
+                                                                        ticks: { callback: (value) => `${value}%` }
+                                                                    }
+                                                                }
                                                             }}
                                                         />
                                                     </div>
@@ -1989,15 +2007,45 @@ const QuantReport = () => {
                                             <div>
                                                 <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px', background: '#f9fafb', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                        <label style={{ fontSize: '11px', color: '#666', fontWeight: 'bold' }}>Rango de Rebalanceo (Meses)</label>
+                                                        <label style={{ fontSize: '11px', color: '#666', fontWeight: 'bold' }}>Modo</label>
+                                                        <select
+                                                            value={wfMatrixRebalanceType}
+                                                            onChange={(e) => setWfMatrixRebalanceType(e.target.value)}
+                                                            style={{ padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+                                                        >
+                                                            <option value="months">Meses</option>
+                                                            <option value="profit">Ganancia (%)</option>
+                                                            <option value="deviation">Desvío (%)</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                        <label style={{ fontSize: '11px', color: '#666', fontWeight: 'bold' }}>
+                                                            {wfMatrixRebalanceType === 'months' ? 'Rango (Meses)' : wfMatrixRebalanceType === 'profit' ? 'Rango Ganancia (%)' : 'Rango Desvío (%)'}
+                                                        </label>
                                                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                            <input type="number" value={wfMatrixRebalanceRange.from} onChange={e => setWfMatrixRebalanceRange(p => ({ ...p, from: parseInt(e.target.value) }))} style={{ width: '50px', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }} title="Desde" />
+                                                            <input type="number" value={wfMatrixRebalanceRange.from} onChange={e => setWfMatrixRebalanceRange(p => ({ ...p, from: parseFloat(e.target.value) }))} style={{ width: '50px', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }} title="Desde" />
                                                             <span>a</span>
-                                                            <input type="number" value={wfMatrixRebalanceRange.to} onChange={e => setWfMatrixRebalanceRange(p => ({ ...p, to: parseInt(e.target.value) }))} style={{ width: '50px', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }} title="Hasta" />
+                                                            <input type="number" value={wfMatrixRebalanceRange.to} onChange={e => setWfMatrixRebalanceRange(p => ({ ...p, to: parseFloat(e.target.value) }))} style={{ width: '50px', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }} title="Hasta" />
                                                             <span>paso</span>
-                                                            <input type="number" value={wfMatrixRebalanceRange.step} onChange={e => setWfMatrixRebalanceRange(p => ({ ...p, step: parseInt(e.target.value) }))} style={{ width: '40px', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }} title="Paso" />
+                                                            <input type="number" value={wfMatrixRebalanceRange.step} onChange={e => setWfMatrixRebalanceRange(p => ({ ...p, step: parseFloat(e.target.value) }))} style={{ width: '40px', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }} title="Paso" />
                                                         </div>
                                                     </div>
+
+                                                    <div style={{ borderLeft: '1px solid #cbd5e1' }}></div>
+
+                                                    {wfMatrixRebalanceType !== 'months' && (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                            <label style={{ fontSize: '11px', color: '#666', fontWeight: 'bold' }}>Num Activos (0=Cartera)</label>
+                                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                                <input type="number" value={wfMatrixAssetsRange.from} onChange={e => setWfMatrixAssetsRange(p => ({ ...p, from: parseInt(e.target.value) }))} style={{ width: '50px', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }} title="Desde" />
+                                                                <span>a</span>
+                                                                <input type="number" value={wfMatrixAssetsRange.to} onChange={e => setWfMatrixAssetsRange(p => ({ ...p, to: parseInt(e.target.value) }))} style={{ width: '50px', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }} title="Hasta" />
+                                                                <span>paso</span>
+                                                                <input type="number" value={wfMatrixAssetsRange.step} onChange={e => setWfMatrixAssetsRange(p => ({ ...p, step: parseInt(e.target.value) }))} style={{ width: '40px', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }} title="Paso" />
+                                                            </div>
+                                                        </div>
+                                                    )}
 
                                                     <div style={{ borderLeft: '1px solid #cbd5e1' }}></div>
 
@@ -2033,19 +2081,19 @@ const QuantReport = () => {
                                                         <div style={{ height: '400px', width: '100%' }}>
                                                             <Plot
                                                                 data={[{
-                                                                    x: wfMatrixData.rebalanceValues,
-                                                                    y: wfMatrixData.results.map(r => r[wfMatrixMetric]),
-                                                                    type: 'scatter',
-                                                                    mode: 'lines+markers',
-                                                                    marker: { size: 8, color: '#10b981' },
-                                                                    line: { color: '#10b981', width: 2 }
+                                                                    x: wfMatrixData.x,
+                                                                    y: wfMatrixData.y,
+                                                                    z: wfMatrixData.z,
+                                                                    type: 'heatmap',
+                                                                    colorscale: 'Viridis',
+                                                                    hoverongaps: false
                                                                 }]}
                                                                 layout={{
-                                                                    title: 'Optimización de Rebalanceo',
+                                                                    title: 'Optimización de Rebalanceo 2D',
                                                                     autosize: true,
-                                                                    margin: { l: 40, r: 20, b: 40, t: 40 },
-                                                                    xaxis: { title: 'Meses de Rebalanceo' },
-                                                                    yaxis: { title: `Score (${wfMatrixMetric.toUpperCase()})` }
+                                                                    margin: { l: 50, r: 20, b: 50, t: 40 },
+                                                                    xaxis: { title: wfMatrixRebalanceType === 'months' ? 'Meses de Rebalanceo' : 'Valor Objetivo (%)' },
+                                                                    yaxis: { title: 'Num de Activos Triggers' }
                                                                 }}
                                                                 style={{ width: "100%", height: "100%" }}
                                                                 config={{ responsive: true, displaylogo: false }}
@@ -2058,7 +2106,8 @@ const QuantReport = () => {
                                                                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                                                                     <thead>
                                                                         <tr style={{ background: '#f8f9fa', color: '#475569', borderBottom: '2px solid #e2e8f0' }}>
-                                                                            <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }}>Rebalanceo (meses)</th>
+                                                                            <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }}>Target</th>
+                                                                            <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }}>Activos</th>
                                                                             <th style={{ padding: '12px', textAlign: 'right', cursor: 'pointer' }}>Retorno (%)</th>
                                                                             <th style={{ padding: '12px', textAlign: 'right', cursor: 'pointer' }}>Max DD (%)</th>
                                                                             <th style={{ padding: '12px', textAlign: 'right', cursor: 'pointer' }}>Ret/DD (Sharpe)</th>

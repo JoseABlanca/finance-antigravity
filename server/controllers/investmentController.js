@@ -2726,8 +2726,10 @@ exports.getWalkforwardMatrix = async (req, res) => {
             tickers,
             years = 5,
             benchmark = 'SPY',
-            rebalanceRange = { from: 1, to: 12, step: 1 },
-            metric = 'sharpe' // 'sharpe', 'return', 'retDrawdown'
+            metric = 'sharpe', // 'sharpe', 'return', 'maxDD'
+            wfMatrixRebalanceType = 'months',
+            wfMatrixRebalanceRange = { from: 1, to: 12, step: 1 },
+            wfMatrixAssetsRange = { from: 0, to: 2, step: 1 }
         } = req.body;
 
         const yahooFinance = new YahooFinance();
@@ -2761,12 +2763,21 @@ exports.getWalkforwardMatrix = async (req, res) => {
 
         if (commonDates.length < 60) return res.status(400).json({ error: "Insufficient data." });
 
-        const results = [];
         const rebalanceValues = [];
-        for (let v = rebalanceRange.from; v <= rebalanceRange.to; v += rebalanceRange.step) rebalanceValues.push(v);
+        for (let v = wfMatrixRebalanceRange.from; v <= wfMatrixRebalanceRange.to; v += wfMatrixRebalanceRange.step) {
+            rebalanceValues.push(v);
+        }
 
-        // Optimization engine (reused logic simplified for speed)
-        const runWFSingle = (rebalanceMonths) => {
+        let assetsValues = [0];
+        if (wfMatrixRebalanceType !== 'months') {
+            assetsValues = [];
+            for (let v = wfMatrixAssetsRange.from; v <= wfMatrixAssetsRange.to; v += wfMatrixAssetsRange.step) {
+                assetsValues.push(v);
+            }
+        }
+
+        // Optimization engine
+        const runWFSingle = (rebalanceValue, assetsTrigger) => {
             let currentCap = 10000;
             const dataMonths = commonDates.length / 21;
             let adjustedIsMonths = 12; // Default 12 month lookback for weights calculation
@@ -2774,20 +2785,17 @@ exports.getWalkforwardMatrix = async (req, res) => {
                 adjustedIsMonths = Math.floor(dataMonths * 0.5); // Use 50% for lookback
                 if (adjustedIsMonths < 3) adjustedIsMonths = 3;
             }
-            let oosStartIndex = commonDates.findIndex(d => {
-                const start = new Date(commonDates[0]);
-                start.setMonth(start.getMonth() + adjustedIsMonths);
-                return d >= start.toISOString().split('T')[0];
-            });
 
-            if (oosStartIndex === -1 || oosStartIndex >= commonDates.length - 10) return null;
+            const firstOOSDate = new Date(commonDates[0]);
+            firstOOSDate.setMonth(firstOOSDate.getMonth() + adjustedIsMonths);
+            let oosStartIndex = commonDates.findIndex(d => d >= firstOOSDate.toISOString().split('T')[0]);
+            if (oosStartIndex === -1) oosStartIndex = Math.floor(commonDates.length / 2);
+            if (oosStartIndex >= commonDates.length - 10) return null;
 
             const eq = [10000];
+
             while (oosStartIndex < commonDates.length - 1) {
                 const oosStart = commonDates[oosStartIndex];
-                let oosEndIndex = oosStartIndex + (rebalanceMonths * 21);
-                if (oosEndIndex >= commonDates.length) oosEndIndex = commonDates.length - 1;
-                const oosEnd = commonDates[oosEndIndex];
 
                 const isEnd = commonDates[oosStartIndex - 1];
                 const isStartObj = new Date(isEnd);
@@ -2817,32 +2825,96 @@ exports.getWalkforwardMatrix = async (req, res) => {
 
                 if (!bestW) break;
 
+                const startCap = currentCap;
                 const shares = tickers.map((t, i) => (currentCap * bestW[i]) / priceMap[oosStart][t]);
-                for (let i = oosStartIndex + 1; i <= oosEndIndex; i++) {
-                    eq.push(tickers.reduce((sum, t, idx) => sum + shares[idx] * priceMap[commonDates[i]][t], 0));
+
+                let oosEndIndex = oosStartIndex;
+
+                for (let i = oosStartIndex + 1; i < commonDates.length; i++) {
+                    const d = commonDates[i];
+                    const dayCap = tickers.reduce((sum, t, idx) => sum + shares[idx] * priceMap[d][t], 0);
+                    eq.push(dayCap);
+
+                    oosEndIndex = i;
+                    currentCap = dayCap;
+                    let shouldRebalance = false;
+
+                    if (wfMatrixRebalanceType === 'months') {
+                        if (i - oosStartIndex >= rebalanceValue * 21) shouldRebalance = true;
+                    } else if (wfMatrixRebalanceType === 'profit') {
+                        if (assetsTrigger === 0) {
+                            const profitPct = ((dayCap - startCap) / startCap) * 100;
+                            if (Math.abs(profitPct) >= rebalanceValue) shouldRebalance = true;
+                        } else {
+                            let assetsHit = 0;
+                            for (let j = 0; j < tickers.length; j++) {
+                                const assetStart = shares[j] * priceMap[oosStart][tickers[j]];
+                                const assetNow = shares[j] * priceMap[d][tickers[j]];
+                                const assetPct = ((assetNow - assetStart) / assetStart) * 100;
+                                if (Math.abs(assetPct) >= rebalanceValue) assetsHit++;
+                            }
+                            if (assetsHit >= assetsTrigger) shouldRebalance = true;
+                        }
+                    } else if (wfMatrixRebalanceType === 'deviation') {
+                        if (assetsTrigger === 0) {
+                            // Deviation for the whole portfolio doesn't make logical sense, we treat 0 as 1 for deviation
+                            let maxDev = 0;
+                            for (let j = 0; j < tickers.length; j++) {
+                                const currentWeight = (shares[j] * priceMap[d][tickers[j]]) / dayCap;
+                                const dev = Math.abs(currentWeight - bestW[j]) * 100;
+                                if (dev > maxDev) maxDev = dev;
+                            }
+                            if (maxDev >= rebalanceValue) shouldRebalance = true;
+                        } else {
+                            let assetsHit = 0;
+                            for (let j = 0; j < tickers.length; j++) {
+                                const currentWeight = (shares[j] * priceMap[d][tickers[j]]) / dayCap;
+                                if (Math.abs(currentWeight - bestW[j]) * 100 >= rebalanceValue) assetsHit++;
+                            }
+                            if (assetsHit >= assetsTrigger) shouldRebalance = true;
+                        }
+                    }
+
+                    if (shouldRebalance) break;
                 }
-                currentCap = eq[eq.length - 1];
+
                 oosStartIndex = oosEndIndex;
+                if (oosStartIndex >= commonDates.length - 1) break;
             }
 
             const totalRet = (currentCap - 10000) / 10000;
             let maxP = eq[0], maxDD = 0;
             eq.forEach(v => { if (v > maxP) maxP = v; const dd = (v - maxP) / maxP; if (dd < maxDD) maxDD = dd; });
-            const mean = totalRet / (eq.length / 252); // Approx annual
 
-            return { return: totalRet * 100, maxDD: Math.abs(maxDD) * 100, sharpe: (totalRet * 100) / (Math.abs(maxDD) * 100 || 1), retDrawdown: (totalRet * 100) / (Math.abs(maxDD) * 100 || 1) };
+            return { return: totalRet * 100, maxDD: Math.abs(maxDD) * 100, sharpe: (totalRet * 100) / (Math.abs(maxDD) * 100 || 1) };
         };
 
-        for (const rebalance of rebalanceValues) {
-            const res = runWFSingle(rebalance);
-            if (res) {
-                results.push({ rebalance, ...res });
+        const results = [];
+        const zMatrix = []; // 2D array: zMatrix[y][x] where y = assets, x = rebalanceValue
+
+        for (let y = 0; y < assetsValues.length; y++) {
+            const row = [];
+            for (let x = 0; x < rebalanceValues.length; x++) {
+                const res = runWFSingle(rebalanceValues[x], assetsValues[y]);
+                if (res) {
+                    row.push(res[metric]); // Save chosen metric for heatmap
+                    results.push({ rebalance: rebalanceValues[x], assets: assetsValues[y], ...res });
+                } else {
+                    row.push(null);
+                }
             }
+            zMatrix.push(row);
         }
 
-        res.json({ rebalanceValues, results });
+        res.json({
+            x: rebalanceValues,
+            y: assetsValues,
+            z: zMatrix,
+            results
+        });
 
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: "Matrix calculation failed", details: err.message });
     }
 };
