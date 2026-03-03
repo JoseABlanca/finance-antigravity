@@ -2464,8 +2464,12 @@ exports.getWalkforwardAnalysis = async (req, res) => {
             years = 5,
             initialCapital = 10000,
             benchmark = 'SPY',
-            rebalanceMonths = 6  // Rebalance frequency
+            rebalanceMonths = 6,  // Legacy fallback
+            rebalanceType = 'months',
+            rebalanceValue
         } = req.body;
+
+        const finalRebalanceValue = rebalanceValue !== undefined ? rebalanceValue : rebalanceMonths;
 
         if (!tickers || !Array.isArray(tickers) || tickers.length < 2) {
             return res.status(400).json({ error: "Invalid tickers for optimization." });
@@ -2603,9 +2607,6 @@ exports.getWalkforwardAnalysis = async (req, res) => {
 
         while (oosStartIndex < commonDates.length - 1) {
             const oosStart = commonDates[oosStartIndex];
-            let oosEndIndex = oosStartIndex + (rebalanceMonths * 21); // Approx 21 trading days per month
-            if (oosEndIndex >= commonDates.length) oosEndIndex = commonDates.length - 1;
-            const oosEnd = commonDates[oosEndIndex];
 
             // Lookback Period (IS)
             const isEndDate = commonDates[oosStartIndex - 1];
@@ -2616,39 +2617,67 @@ exports.getWalkforwardAnalysis = async (req, res) => {
             const weights = optimizeOnRange(isStart, isEndDate);
             if (!weights) break;
 
+            const startCap = currentCap;
+            const shares = tickers.map((t, i) => (startCap * weights[i]) / priceMap[oosStart][t]);
+
+            let oosEndIndex = oosStartIndex;
+
+            for (let i = oosStartIndex + 1; i < commonDates.length; i++) {
+                const d = commonDates[i];
+
+                // Track equity for the day
+                const dayCap = tickers.reduce((sum, t, idx) => sum + shares[idx] * priceMap[d][t], 0);
+
+                suiteEquity.push(dayCap);
+                const sVal = tickers.reduce((sum, t, idx) => sum + staticShares[idx] * priceMap[d][t], 0);
+                staticEquity.push(sVal);
+                benchEquity.push(benchShares * priceMap[d][benchmark]);
+                const bVal = tickers.reduce((sum, t, idx) => sum + baselineShares[idx] * priceMap[d][t], 0);
+                baselineEquity.push(bVal);
+                suiteDates.push(d);
+
+                oosEndIndex = i;
+                currentCap = dayCap;
+
+                let shouldRebalance = false;
+
+                // Evaluate Dynamic Triggers
+                if (rebalanceType === 'months') {
+                    if (i - oosStartIndex >= finalRebalanceValue * 21) {
+                        shouldRebalance = true;
+                    }
+                } else if (rebalanceType === 'profit') {
+                    const profitPct = ((dayCap - startCap) / startCap) * 100;
+                    if (Math.abs(profitPct) >= finalRebalanceValue) {
+                        shouldRebalance = true;
+                    }
+                } else if (rebalanceType === 'deviation') {
+                    for (let j = 0; j < tickers.length; j++) {
+                        const currentWeight = (shares[j] * priceMap[d][tickers[j]]) / dayCap;
+                        if (Math.abs(currentWeight - weights[j]) * 100 >= finalRebalanceValue) {
+                            shouldRebalance = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (shouldRebalance) break;
+            }
+
+            const oosEnd = commonDates[oosEndIndex];
             const isPerf = getPerformance(isStart, isEndDate, weights, 10000);
-            const oosPerf = getPerformance(oosStart, oosEnd, weights, currentCap);
 
             windows.push({
                 isPeriod: `${isStart} - ${isEndDate}`,
                 oosPeriod: `${oosStart} - ${oosEnd}`,
                 daysIS: isPerf.days,
-                daysOOS: oosPerf.days,
+                daysOOS: oosEndIndex - oosStartIndex,
                 netProfitIS: (isPerf.netProfit / 10000) * 100, // Return as %
-                netProfitOOS: (oosPerf.netProfit / currentCap) * 100, // Return as %
-                accumulatedReturn: ((oosPerf.endCap - initialCapital) / initialCapital) * 100,
+                netProfitOOS: ((currentCap - startCap) / startCap) * 100, // Return as %
+                accumulatedReturn: ((currentCap - initialCapital) / initialCapital) * 100,
                 weights: Object.fromEntries(tickers.map((t, idx) => [t, weights[idx]]))
             });
 
-            // Fill equity curve for this OOS segment
-            const shares = tickers.map((t, i) => (currentCap * weights[i]) / priceMap[oosStart][t]);
-            for (let i = oosStartIndex + 1; i <= oosEndIndex; i++) {
-                const d = commonDates[i];
-                // WF Strategy
-                const val = tickers.reduce((sum, t, idx) => sum + shares[idx] * priceMap[d][t], 0);
-                suiteEquity.push(val);
-                // Static Strategy
-                const sVal = tickers.reduce((sum, t, idx) => sum + staticShares[idx] * priceMap[d][t], 0);
-                staticEquity.push(sVal);
-                // Benchmark
-                benchEquity.push(benchShares * priceMap[d][benchmark]);
-                // Baseline
-                const bVal = tickers.reduce((sum, t, idx) => sum + baselineShares[idx] * priceMap[d][t], 0);
-                baselineEquity.push(bVal);
-                suiteDates.push(d);
-            }
-
-            currentCap = oosPerf.endCap;
             oosStartIndex = oosEndIndex;
             if (oosStartIndex >= commonDates.length - 1) break;
         }

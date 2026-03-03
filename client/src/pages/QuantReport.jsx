@@ -61,7 +61,8 @@ const QuantReport = () => {
     const [correlationType, setCorrelationType] = useState('returns'); // returns, drawdowns
     const [walkforwardData, setWalkforwardData] = useState(null);
     const [walkforwardLoading, setWalkforwardLoading] = useState(false);
-    const [wfRebalanceMonths, setWfRebalanceMonths] = useState(6);
+    const [wfRebalanceType, setWfRebalanceType] = useState('months'); // 'months', 'profit', 'deviation'
+    const [wfRebalanceValue, setWfRebalanceValue] = useState(6);
     const [wfSource, setWfSource] = useState('optimizer'); // 'optimizer' or 'portfolio'
     const [wfTab, setWfTab] = useState('analysis'); // 'analysis', 'matrix'
     const [wfMatrixData, setWfMatrixData] = useState(null);
@@ -115,19 +116,13 @@ const QuantReport = () => {
         // Fetch Correlation
         setCorrelationLoading(true);
         try {
-            let weightsPayload = undefined;
-            if (correlationWeightMode === 'portfolio' && optRes && optRes.data.weights && optRes.data.weights[optimizerPortfolio]) {
-                weightsPayload = optRes.data.weights[optimizerPortfolio];
-            }
-
             const resCor = await api.post('/investments/correlation', {
                 tickers: tickersList,
                 startDate,
                 endDate,
                 years,
                 period: correlationPeriod,
-                type: correlationType,
-                weights: weightsPayload
+                type: correlationType
             });
             setCorrelationData(resCor.data);
         } catch (err) {
@@ -151,7 +146,8 @@ const QuantReport = () => {
                 const resWf2 = await api.post('/investments/walkforward', {
                     tickers: tickersList,
                     years: years,
-                    rebalanceMonths: wfRebalanceMonths,
+                    rebalanceType: wfRebalanceType,
+                    rebalanceValue: wfRebalanceValue,
                     initialCapital: 10000,
                     benchmark: benchmark
                 });
@@ -1798,12 +1794,33 @@ const QuantReport = () => {
                                                         </select>
                                                     </div>
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                        <label style={{ fontSize: '11px', color: '#666' }}>Meses de Rebalanceo</label>
+                                                        <label style={{ fontSize: '11px', color: '#666' }}>Modo de Rebalanceo</label>
+                                                        <select
+                                                            value={wfRebalanceType}
+                                                            onChange={(e) => {
+                                                                setWfRebalanceType(e.target.value);
+                                                                if (e.target.value === 'months') setWfRebalanceValue(6);
+                                                                if (e.target.value === 'profit') setWfRebalanceValue(10);
+                                                                if (e.target.value === 'deviation') setWfRebalanceValue(5);
+                                                            }}
+                                                            style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}
+                                                        >
+                                                            <option value="months">Por Periodo Fijo (Meses)</option>
+                                                            <option value="profit">Por Ganancia de Cartera (%)</option>
+                                                            <option value="deviation">Por Desajuste de Pesos (%)</option>
+                                                        </select>
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                        <label style={{ fontSize: '11px', color: '#666', minHeight: '13px' }}>
+                                                            {wfRebalanceType === 'months' ? 'Meses de Rebalanceo' :
+                                                                wfRebalanceType === 'profit' ? 'Objetivo de Ganancia (%)' :
+                                                                    'Desvío Tolerado (%)'}
+                                                        </label>
                                                         <input
                                                             type="number"
-                                                            value={wfRebalanceMonths}
-                                                            onChange={(e) => setWfRebalanceMonths(parseInt(e.target.value))}
-                                                            style={{ width: '60px', padding: '6px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}
+                                                            value={wfRebalanceValue}
+                                                            onChange={(e) => setWfRebalanceValue(parseFloat(e.target.value))}
+                                                            style={{ width: '80px', padding: '6px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}
                                                         />
                                                     </div>
                                                     <button
