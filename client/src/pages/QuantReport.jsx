@@ -61,9 +61,13 @@ const QuantReport = () => {
     const [correlationType, setCorrelationType] = useState('returns'); // returns, drawdowns
     const [walkforwardData, setWalkforwardData] = useState(null);
     const [walkforwardLoading, setWalkforwardLoading] = useState(false);
-    const [wfIsMonths, setWfIsMonths] = useState(24);
-    const [wfOosMonths, setWfOosMonths] = useState(6);
+    const [wfRebalanceMonths, setWfRebalanceMonths] = useState(6);
     const [wfSource, setWfSource] = useState('optimizer'); // 'optimizer' or 'portfolio'
+    const [wfTab, setWfTab] = useState('analysis'); // 'analysis', 'matrix'
+    const [wfMatrixData, setWfMatrixData] = useState(null);
+    const [wfMatrixLoading, setWfMatrixLoading] = useState(false);
+    const [wfMatrixRebalanceRange, setWfMatrixRebalanceRange] = useState({ from: 1, to: 12, step: 1 });
+    const [wfMatrixMetric, setWfMatrixMetric] = useState('sharpe');
 
     // Monte Carlo State
     const [mcSimulations, setMcSimulations] = useState(100);
@@ -90,7 +94,7 @@ const QuantReport = () => {
         setError(null);
         setSelectedWeights(null);
         setSelectedPortfolioInfo(null);
-        const tickersList = optTickers.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0);
+        const tickersList = optTickers.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0 && t !== 'WALKFORWARD');
 
         let optRes = null;
         try {
@@ -111,13 +115,19 @@ const QuantReport = () => {
         // Fetch Correlation
         setCorrelationLoading(true);
         try {
+            let weightsPayload = undefined;
+            if (correlationWeightMode === 'portfolio' && optRes && optRes.data.weights && optRes.data.weights[optimizerPortfolio]) {
+                weightsPayload = optRes.data.weights[optimizerPortfolio];
+            }
+
             const resCor = await api.post('/investments/correlation', {
                 tickers: tickersList,
                 startDate,
                 endDate,
                 years,
                 period: correlationPeriod,
-                type: correlationType
+                type: correlationType,
+                weights: weightsPayload
             });
             setCorrelationData(resCor.data);
         } catch (err) {
@@ -141,8 +151,7 @@ const QuantReport = () => {
                 const resWf2 = await api.post('/investments/walkforward', {
                     tickers: tickersList,
                     years: years,
-                    isMonths: wfIsMonths,
-                    oosMonths: wfOosMonths,
+                    rebalanceMonths: wfRebalanceMonths,
                     initialCapital: 10000,
                     benchmark: benchmark
                 });
@@ -156,11 +165,39 @@ const QuantReport = () => {
         }
     };
 
+    const fetchWalkforwardMatrix = async () => {
+        setWfMatrixLoading(true);
+        try {
+            const tickersList = wfSource === 'portfolio'
+                ? portfolioAssets
+                : optTickers.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0 && t !== 'WALKFORWARD');
+
+            if (tickersList.length >= 2) {
+                const res = await api.post('/investments/walkforward-matrix', {
+                    tickers: tickersList,
+                    rebalanceRange: wfMatrixRebalanceRange,
+                    metric: wfMatrixMetric,
+                    initialCapital: 10000,
+                    benchmark: benchmark
+                });
+                setWfMatrixData(res.data);
+            }
+        } catch (err) {
+            console.error("Walkforward Matrix error:", err);
+            setWfMatrixData(null);
+        } finally {
+            setWfMatrixLoading(false);
+        }
+    };
+
     const fetchCorrelation = async () => {
-        if (!optTickers) return;
+        if (!optTickers && (!portfolioAssets || portfolioAssets.length === 0)) return;
         setCorrelationLoading(true);
         try {
-            const tickersList = optTickers.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0);
+            const tickersList = wfSource === 'portfolio'
+                ? portfolioAssets.map(a => a.ticker)
+                : optTickers.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0 && t !== 'WALKFORWARD');
+
             const resCor = await api.post('/investments/correlation', {
                 tickers: tickersList,
                 startDate,
@@ -179,7 +216,7 @@ const QuantReport = () => {
 
     // Auto-fetch correlation when filters change (if optimization already ran)
     useEffect(() => {
-        if (optData) {
+        if (optData || portfolioAssets.length > 0) {
             fetchCorrelation();
         }
     }, [correlationPeriod, correlationType]);
@@ -1639,290 +1676,409 @@ const QuantReport = () => {
                                                     <option value="returns">Retornos</option>
                                                     <option value="drawdowns">Drawdowns</option>
                                                 </select>
+                                                <select
+                                                    value={correlationWeightMode}
+                                                    onChange={(e) => setCorrelationWeightMode(e.target.value)}
+                                                    style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px', background: '#f8f9fa' }}
+                                                >
+                                                    <option value="base">Base Assets (No pesos)</option>
+                                                    <option value="portfolio">Portfolio Seleccionado</option>
+                                                </select>
                                             </div>
                                         </div>
                                         {correlationLoading ? <p>Cargando matriz...</p> : correlationData ? (
-                                            <div style={{ overflowX: 'auto' }}>
-                                                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '14px' }}>
-                                                    <thead>
-                                                        <tr>
-                                                            <th style={{ padding: '8px', borderBottom: '2px solid #ddd' }}></th>
-                                                            {correlationData.tickers.map(t => <th key={t} style={{ padding: '8px', borderBottom: '2px solid #ddd' }}>{t}</th>)}
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {correlationData.tickers.map((t1, i) => (
-                                                            <tr key={t1}>
-                                                                <td style={{ padding: '8px', borderBottom: '1px solid #eee', fontWeight: 'bold', textAlign: 'left' }}>{t1}</td>
-                                                                {correlationData.tickers.map((t2, j) => {
-                                                                    const val = correlationData.matrix[i][j];
-                                                                    // Green (positive corr) → White (no corr) → Red (negative corr)
-                                                                    let color, textColor;
-                                                                    if (i === j) {
-                                                                        color = '#10b981'; textColor = 'white'; // diagonal = perfect 1.0 = dark green
-                                                                    } else if (val > 0) {
-                                                                        const intensity = Math.min(val, 1);
-                                                                        const r = Math.round(255 - 180 * intensity);
-                                                                        const g = Math.round(255);
-                                                                        const b = Math.round(255 - 180 * intensity);
-                                                                        color = `rgb(${r},${g},${b})`;
-                                                                        textColor = intensity > 0.5 ? 'white' : '#333';
-                                                                    } else {
-                                                                        const intensity = Math.min(Math.abs(val), 1);
-                                                                        const r = Math.round(255);
-                                                                        const g = Math.round(255 - 180 * intensity);
-                                                                        const b = Math.round(255 - 180 * intensity);
-                                                                        color = `rgb(${r},${g},${b})`;
-                                                                        textColor = intensity > 0.5 ? 'white' : '#333';
-                                                                    }
-                                                                    return (
-                                                                        <td key={t2} style={{ padding: '8px', borderBottom: '1px solid #eee', color: textColor, background: color }}>
-                                                                            {val.toFixed(2)}
-                                                                        </td>
-                                                                    );
-                                                                })}
+                                            <>
+                                                <div style={{ overflowX: 'auto' }}>
+                                                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '14px' }}>
+                                                        <thead>
+                                                            <tr>
+                                                                <th style={{ padding: '8px', borderBottom: '2px solid #ddd' }}></th>
+                                                                {correlationData.tickers.map(t => <th key={t} style={{ padding: '8px', borderBottom: '2px solid #ddd' }}>{t}</th>)}
                                                             </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
+                                                        </thead>
+                                                        <tbody>
+                                                            {correlationData.tickers.map((t1, i) => (
+                                                                <tr key={t1}>
+                                                                    <td style={{ padding: '8px', borderBottom: '1px solid #eee', fontWeight: 'bold', textAlign: 'left' }}>{t1}</td>
+                                                                    {correlationData.tickers.map((t2, j) => {
+                                                                        const val = correlationData.matrix[i][j];
+                                                                        // Green (positive corr) → White (no corr) → Red (negative corr)
+                                                                        let color, textColor;
+                                                                        if (i === j) {
+                                                                            color = '#34d399'; textColor = 'white'; // diagonal = perfect 1.0 = lighter green
+                                                                        } else if (val > 0) {
+                                                                            const intensity = Math.min(val, 1) * 0.6; // Reduce saturation for lighter green
+                                                                            const r = Math.round(255 - 180 * intensity);
+                                                                            const g = Math.round(255);
+                                                                            const b = Math.round(255 - 180 * intensity);
+                                                                            color = `rgb(${r},${g},${b})`;
+                                                                            textColor = intensity > 0.4 ? 'white' : '#333';
+                                                                        } else {
+                                                                            const intensity = Math.min(Math.abs(val), 1) * 0.6; // Reduce saturation for lighter red
+                                                                            const r = Math.round(255);
+                                                                            const g = Math.round(255 - 180 * intensity);
+                                                                            const b = Math.round(255 - 180 * intensity);
+                                                                            color = `rgb(${r},${g},${b})`;
+                                                                            textColor = intensity > 0.4 ? 'white' : '#333';
+                                                                        }
+                                                                        return (
+                                                                            <td key={t2} style={{ padding: '8px', borderBottom: '1px solid #eee', color: textColor, background: color }}>
+                                                                                {val.toFixed(2)}
+                                                                            </td>
+                                                                        );
+                                                                    })}
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+
+                                                {correlationData.rawReturns && Object.keys(correlationData.rawReturns).length > 0 && (
+                                                    <div style={{ marginTop: '48px', height: '600px', width: '100%' }}>
+                                                        <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '16px' }}>Pairplot de Retornos</h3>
+                                                        <Plot
+                                                            data={[{
+                                                                type: 'splom',
+                                                                dimensions: Object.keys(correlationData.rawReturns).map(ticker => ({
+                                                                    label: ticker,
+                                                                    values: correlationData.rawReturns[ticker]
+                                                                })),
+                                                                marker: {
+                                                                    color: '#10b981',
+                                                                    size: 3,
+                                                                    line: { color: 'white', width: 0.5 }
+                                                                },
+                                                                diagonal: { visible: false }
+                                                            }]}
+                                                            layout={{
+                                                                autosize: true,
+                                                                margin: { l: 40, r: 0, b: 40, t: 0 },
+                                                                dragmode: 'pan',
+                                                                hovermode: 'closest'
+                                                            }}
+                                                            style={{ width: "100%", height: "100%" }}
+                                                            config={{ responsive: true, displaylogo: false }}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </>
                                         ) : <p>No hay datos de correlación disponibles. Ejecute la optimización primero.</p>}
                                     </div>
                                 )}
 
-                                <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
-                                        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>Walkforward Analysis</h3>
 
-                                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                <label style={{ fontSize: '11px', color: '#666' }}>Activos</label>
-                                                <select
-                                                    value={wfSource}
-                                                    onChange={(e) => setWfSource(e.target.value)}
-                                                    style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}
-                                                >
-                                                    <option value="optimizer">Optimizer Tickers</option>
-                                                    <option value="portfolio">Mi Portfolio</option>
-                                                </select>
+                                {optTab === 'walkforward' && (
+                                    <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>Análisis de Rebalanceo</h3>
+                                                <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '8px', padding: '4px' }}>
+                                                    <button
+                                                        onClick={() => setWfTab('analysis')}
+                                                        style={{ padding: '6px 16px', borderRadius: '6px', border: 'none', background: wfTab === 'analysis' ? 'white' : 'transparent', color: wfTab === 'analysis' ? '#1e3a8a' : '#64748b', fontWeight: wfTab === 'analysis' ? '600' : 'normal', cursor: 'pointer', boxShadow: wfTab === 'analysis' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+                                                    >Análisis</button>
+                                                    <button
+                                                        onClick={() => setWfTab('matrix')}
+                                                        style={{ padding: '6px 16px', borderRadius: '6px', border: 'none', background: wfTab === 'matrix' ? 'white' : 'transparent', color: wfTab === 'matrix' ? '#1e3a8a' : '#64748b', fontWeight: wfTab === 'matrix' ? '600' : 'normal', cursor: 'pointer', boxShadow: wfTab === 'matrix' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+                                                    >Optimización de Matriz</button>
+                                                </div>
                                             </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                <label style={{ fontSize: '11px', color: '#666' }}>Meses IS (Lookback)</label>
-                                                <input
-                                                    type="number"
-                                                    value={wfIsMonths}
-                                                    onChange={(e) => setWfIsMonths(parseInt(e.target.value))}
-                                                    style={{ width: '60px', padding: '6px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}
-                                                />
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                <label style={{ fontSize: '11px', color: '#666' }}>Meses OOS (Rebalanceo)</label>
-                                                <input
-                                                    type="number"
-                                                    value={wfOosMonths}
-                                                    onChange={(e) => setWfOosMonths(parseInt(e.target.value))}
-                                                    style={{ width: '60px', padding: '6px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}
-                                                />
-                                            </div>
-                                            <button
-                                                onClick={fetchWalkforward}
-                                                disabled={walkforwardLoading}
-                                                style={{ padding: '8px 16px', background: '#1e3a8a', color: 'white', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: '500', fontSize: '13px', alignSelf: 'flex-end' }}
-                                            >
-                                                {walkforwardLoading ? 'Calculando...' : 'Recalcular'}
-                                            </button>
+
+                                            {wfTab === 'analysis' && (
+                                                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                        <label style={{ fontSize: '11px', color: '#666' }}>Activos</label>
+                                                        <select
+                                                            value={wfSource}
+                                                            onChange={(e) => setWfSource(e.target.value)}
+                                                            style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}
+                                                        >
+                                                            <option value="optimizer">Optimizer Tickers</option>
+                                                            <option value="portfolio">Mi Portfolio</option>
+                                                        </select>
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                        <label style={{ fontSize: '11px', color: '#666' }}>Meses de Rebalanceo</label>
+                                                        <input
+                                                            type="number"
+                                                            value={wfRebalanceMonths}
+                                                            onChange={(e) => setWfRebalanceMonths(parseInt(e.target.value))}
+                                                            style={{ width: '60px', padding: '6px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        onClick={fetchWalkforward}
+                                                        disabled={walkforwardLoading}
+                                                        style={{ padding: '8px 16px', background: '#1e3a8a', color: 'white', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: '500', fontSize: '13px', alignSelf: 'flex-end' }}
+                                                    >
+                                                        {walkforwardLoading ? 'Calculando...' : 'Recalcular'}
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
-                                    </div>
 
-                                    {walkforwardLoading ? (
-                                        <div style={{ padding: '40px', textAlign: 'center' }}>
-                                            <div className="spinner" style={{ border: '3px solid #f3f3f3', borderTop: '3px solid #1e3a8a', borderRadius: '50%', width: '30px', height: '30px', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
-                                            <p>Ejecutando simulación walkforward con re-optimización periódica...</p>
-                                        </div>
-                                    ) : walkforwardData ? (
-                                        <div>
-                                            <p style={{ fontSize: '14px', color: '#666', marginBottom: '16px' }}>
-                                                Simulación de re-optimización periódica (Rolling Window). Cada {wfOosMonths} meses se optimiza el portfolio usando los {wfIsMonths} meses anteriores (In-Sample) y se aplica el resultado al periodo siguiente (Out-of-Sample).
-                                            </p>
-
-                                            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
-                                                <div style={{ padding: '16px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' }}>
-                                                    <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>Retorno Walkforward</div>
-                                                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: walkforwardData.metrics?.portfolioReturn >= 0 ? '#10b981' : '#ef4444' }}>
-                                                        {((walkforwardData.metrics?.portfolioReturn || 0) * 100).toFixed(2)}%
-                                                    </div>
+                                        {wfTab === 'analysis' ? (
+                                            walkforwardLoading ? (
+                                                <div style={{ padding: '40px', textAlign: 'center' }}>
+                                                    <div className="spinner" style={{ border: '3px solid #f3f3f3', borderTop: '3px solid #1e3a8a', borderRadius: '50%', width: '30px', height: '30px', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
+                                                    <p>Ejecutando simulación walkforward con re-optimización periódica...</p>
                                                 </div>
-                                                <div style={{ padding: '16px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' }}>
-                                                    <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>Cartera Estática</div>
-                                                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: walkforwardData.metrics?.staticReturn >= 0 ? '#10b981' : '#ef4444' }}>
-                                                        {((walkforwardData.metrics?.staticReturn || 0) * 100).toFixed(2)}%
+                                            ) : walkforwardData ? (
+                                                <div>
+                                                    <div style={{ height: isMobile ? '280px' : '380px', width: '100%', marginBottom: '32px' }}>
+                                                        <Line
+                                                            data={{
+                                                                labels: walkforwardData.dates || [],
+                                                                datasets: [
+                                                                    {
+                                                                        label: 'Equity Rebalanceo',
+                                                                        data: walkforwardData.portfolioEquity || [],
+                                                                        borderColor: '#1e88e5',
+                                                                        backgroundColor: 'rgba(30, 136, 229, 0.1)',
+                                                                        fill: true,
+                                                                        borderWidth: 2,
+                                                                        pointRadius: 0,
+                                                                        tension: 0.1
+                                                                    },
+                                                                    {
+                                                                        label: 'Cartera Estática',
+                                                                        data: walkforwardData.staticEquity || [],
+                                                                        borderColor: '#9333ea',
+                                                                        backgroundColor: 'transparent',
+                                                                        fill: false,
+                                                                        borderWidth: 2,
+                                                                        pointRadius: 0,
+                                                                        tension: 0.1
+                                                                    },
+                                                                    {
+                                                                        label: 'Benchmark (SPY)',
+                                                                        data: walkforwardData.benchmarkEquity || [],
+                                                                        borderColor: '#9ca3af',
+                                                                        backgroundColor: 'transparent',
+                                                                        fill: false,
+                                                                        borderDash: [5, 5],
+                                                                        borderWidth: 1.5,
+                                                                        pointRadius: 0,
+                                                                        tension: 0.1
+                                                                    },
+                                                                    {
+                                                                        label: 'Activo Base (EW - No Optimizado)',
+                                                                        data: walkforwardData.baselineEquity || [],
+                                                                        borderColor: '#10b981',
+                                                                        backgroundColor: 'transparent',
+                                                                        fill: false,
+                                                                        borderWidth: 1.5,
+                                                                        pointRadius: 0,
+                                                                        tension: 0.1
+                                                                    }
+                                                                ]
+                                                            }}
+                                                            options={{
+                                                                responsive: true,
+                                                                maintainAspectRatio: false,
+                                                                plugins: { legend: { display: true }, tooltip: { mode: 'index', intersect: false } },
+                                                                scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } }, y: { grid: { color: '#f5f5f5' } } }
+                                                            }}
+                                                        />
                                                     </div>
-                                                </div>
-                                                <div style={{ padding: '16px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' }}>
-                                                    <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>Benchmark (SPY)</div>
-                                                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: walkforwardData.metrics?.benchmarkReturn >= 0 ? '#10b981' : '#ef4444' }}>
-                                                        {((walkforwardData.metrics?.benchmarkReturn || 0) * 100).toFixed(2)}%
-                                                    </div>
-                                                </div>
-                                                <div style={{ padding: '16px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' }}>
-                                                    <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>Max DD (WF)</div>
-                                                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ef4444' }}>
-                                                        {((walkforwardData.metrics?.portfolioMaxDrawdown || 0) * 100).toFixed(2)}%
-                                                    </div>
-                                                </div>
-                                            </div>
 
-                                            <div style={{ height: isMobile ? '280px' : '380px', width: '100%', marginBottom: '32px' }}>
-                                                <Line
-                                                    data={{
-                                                        labels: walkforwardData.dates || [],
-                                                        datasets: [
-                                                            {
-                                                                label: 'Equity Walkforward',
-                                                                data: walkforwardData.portfolioEquity || [],
-                                                                borderColor: '#1e88e5',
-                                                                backgroundColor: 'rgba(30, 136, 229, 0.1)',
-                                                                fill: true,
-                                                                borderWidth: 2,
-                                                                pointRadius: 0,
-                                                                tension: 0.1
-                                                            },
-                                                            {
-                                                                label: 'Cartera Estática',
-                                                                data: walkforwardData.staticEquity || [],
-                                                                borderColor: '#9333ea',
-                                                                backgroundColor: 'transparent',
-                                                                fill: false,
-                                                                borderWidth: 2,
-                                                                pointRadius: 0,
-                                                                tension: 0.1
-                                                            },
-                                                            {
-                                                                label: 'Benchmark (SPY)',
-                                                                data: walkforwardData.benchmarkEquity || [],
-                                                                borderColor: '#9ca3af',
-                                                                backgroundColor: 'transparent',
-                                                                fill: false,
-                                                                borderDash: [5, 5],
-                                                                borderWidth: 1.5,
-                                                                pointRadius: 0,
-                                                                tension: 0.1
-                                                            }
-                                                        ]
-                                                    }}
-                                                    options={{
-                                                        responsive: true,
-                                                        maintainAspectRatio: false,
-                                                        plugins: { legend: { display: true }, tooltip: { mode: 'index', intersect: false } },
-                                                        scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } }, y: { grid: { color: '#f5f5f5' } } }
-                                                    }}
-                                                />
-                                            </div>
-
-                                            <div style={{ marginBottom: '32px' }}>
-                                                <h4 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '16px' }}>Esquema de Periodos (Roll-Forward)</h4>
-                                                <div style={{ background: '#fdfdfd', border: '1px solid #eee', borderRadius: '8px', padding: '16px', overflowX: 'auto' }}>
-                                                    <div style={{ minWidth: '600px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                        {walkforwardData.windows?.map((w, idx) => {
-                                                            // Simple staircase rendering calculation
-                                                            const totalWin = walkforwardData.windows.length;
-                                                            const isWidth = 40; // percent
-                                                            const oosWidth = 10; // percent
-                                                            const stepShift = (100 - (isWidth + oosWidth)) / totalWin;
-                                                            const leftShift = idx * stepShift;
-
-                                                            return (
-                                                                <div key={idx} style={{ display: 'flex', height: '20px', position: 'relative', alignItems: 'center' }}>
-                                                                    <div style={{ fontSize: '10px', width: '30px', color: '#999' }}>W{idx + 1}</div>
-                                                                    <div style={{ flex: 1, height: '14px', position: 'relative', background: '#f5f5f5', borderRadius: '4px' }}>
-                                                                        <div style={{
-                                                                            position: 'absolute',
-                                                                            left: `${leftShift}%`,
-                                                                            width: `${isWidth}%`,
-                                                                            height: '100%',
-                                                                            background: '#3b82f6',
-                                                                            borderRadius: '4px 0 0 4px',
-                                                                            display: 'flex',
-                                                                            alignItems: 'center',
-                                                                            justifyContent: 'center',
-                                                                            color: 'white',
-                                                                            fontSize: '8px',
-                                                                            fontWeight: 'bold'
-                                                                        }}>IS {idx + 1}</div>
-                                                                        <div style={{
-                                                                            position: 'absolute',
-                                                                            left: `${leftShift + isWidth}%`,
-                                                                            width: `${oosWidth}%`,
-                                                                            height: '100%',
-                                                                            background: '#10b981',
-                                                                            borderRadius: '0 4px 4px 0',
-                                                                            display: 'flex',
-                                                                            alignItems: 'center',
-                                                                            justifyContent: 'center',
-                                                                            color: 'white',
-                                                                            fontSize: '8px',
-                                                                            fontWeight: 'bold'
-                                                                        }}>OOS</div>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: '30px', marginTop: '8px', fontSize: '10px', color: '#999' }}>
-                                                            <span>Inicio Datos</span>
-                                                            <span>Tiempo →</span>
-                                                            <span>Hoy</span>
+                                                    {/* Esquema de Periodos */}
+                                                    <div style={{ marginBottom: '32px' }}>
+                                                        <h4 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '12px' }}>Esquema de Rebalanceos</h4>
+                                                        <div style={{ height: '300px', width: '100%' }}>
+                                                            <Bar
+                                                                data={{
+                                                                    labels: walkforwardData.windows?.map((w, idx) => `Ventana ${idx + 1}`),
+                                                                    datasets: [
+                                                                        {
+                                                                            label: 'Retorno de Rebalanceo (%)',
+                                                                            data: walkforwardData.windows?.map(w => w.netProfitOOS),
+                                                                            backgroundColor: walkforwardData.windows?.map(w => w.netProfitOOS >= 0 ? 'rgba(16, 185, 129, 0.6)' : 'rgba(239, 68, 68, 0.6)'),
+                                                                            borderColor: walkforwardData.windows?.map(w => w.netProfitOOS >= 0 ? '#10b981' : '#ef4444'),
+                                                                            borderWidth: 1
+                                                                        }
+                                                                    ]
+                                                                }}
+                                                                options={{
+                                                                    responsive: true,
+                                                                    maintainAspectRatio: false,
+                                                                    plugins: {
+                                                                        legend: { display: false },
+                                                                        tooltip: {
+                                                                            callbacks: {
+                                                                                title: (items) => {
+                                                                                    if (!items.length) return '';
+                                                                                    const idx = items[0].dataIndex;
+                                                                                    return walkforwardData.windows[idx].oosPeriod;
+                                                                                },
+                                                                                label: (ctx) => `Retorno: ${ctx.raw.toFixed(2)}%`
+                                                                            }
+                                                                        }
+                                                                    },
+                                                                    scales: {
+                                                                        y: {
+                                                                            title: { display: true, text: 'Retorno (%)' }
+                                                                        }
+                                                                    }
+                                                                }}
+                                                            />
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </div>
 
-                                            <div style={{ overflowX: 'auto' }}>
-                                                <h4 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '12px' }}>Detalle de Ventanas</h4>
-                                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                                                    <thead>
-                                                        <tr style={{ background: '#f8f9fa', color: '#666', borderBottom: '2px solid #eee' }}>
-                                                            <th style={{ padding: '12px', textAlign: 'left' }}>Periodo IS</th>
-                                                            <th style={{ padding: '12px', textAlign: 'left' }}>Periodo OOS</th>
-                                                            <th style={{ padding: '12px', textAlign: 'center' }}>Días IS</th>
-                                                            <th style={{ padding: '12px', textAlign: 'center' }}>Días OOS</th>
-                                                            <th style={{ padding: '12px', textAlign: 'right' }}>Beneficio IS</th>
-                                                            <th style={{ padding: '12px', textAlign: 'right' }}>Beneficio OOS</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {walkforwardData.windows?.map((w, idx) => (
-                                                            <tr key={idx} style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <td style={{ padding: '10px' }}>{w.isPeriod}</td>
-                                                                <td style={{ padding: '10px', fontWeight: '500', color: '#1e3a8a' }}>{w.oosPeriod}</td>
-                                                                <td style={{ padding: '10px', textAlign: 'center' }}>{w.daysIS}</td>
-                                                                <td style={{ padding: '10px', textAlign: 'center' }}>{w.daysOOS}</td>
-                                                                <td style={{ padding: '10px', textAlign: 'right', color: w.netProfitIS >= 0 ? '#10b981' : '#ef4444' }}>
-                                                                    {w.netProfitIS.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
-                                                                </td>
-                                                                <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold', color: w.netProfitOOS >= 0 ? '#10b981' : '#ef4444' }}>
-                                                                    {w.netProfitOOS.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
+                                                    <div style={{ overflowX: 'auto' }}>
+                                                        <h4 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '12px' }}>Detalle de Ventanas</h4>
+                                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                                            <thead>
+                                                                <tr style={{ background: '#f8f9fa', color: '#666', borderBottom: '2px solid #eee' }}>
+                                                                    <th style={{ padding: '12px', textAlign: 'left' }}>Periodo Rebalanceo</th>
+                                                                    <th style={{ padding: '12px', textAlign: 'center' }}>Días Rebalanceo</th>
+                                                                    <th style={{ padding: '12px', textAlign: 'right' }}>Retorno (%)</th>
+                                                                    <th style={{ padding: '12px', textAlign: 'right' }}>Retorno Acumulado (%)</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {walkforwardData.windows?.map((w, idx) => (
+                                                                    <tr key={idx} style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                                                        <td style={{ padding: '10px', fontWeight: '500', color: '#1e3a8a' }}>{w.oosPeriod}</td>
+                                                                        <td style={{ padding: '10px', textAlign: 'center' }}>{w.daysOOS}</td>
+                                                                        <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold', color: w.netProfitOOS >= 0 ? '#10b981' : '#ef4444' }}>
+                                                                            {w.netProfitOOS.toFixed(2)}%
+                                                                        </td>
+                                                                        <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold', color: w.accumulatedReturn >= 0 ? '#10b981' : '#ef4444' }}>
+                                                                            {w.accumulatedReturn !== undefined ? w.accumulatedReturn.toFixed(2) + '%' : '-'}
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div style={{ padding: '40px', background: '#f0f4ff', borderRadius: '10px', border: '1px solid #c7d7f8', color: '#334', textAlign: 'center' }}>
+                                                    <h4 style={{ margin: '0 0 10px 0', fontSize: '16px', color: '#1e3a8a' }}> Configuración Análisis de Rebalanceo</h4>
+                                                    <p style={{ margin: '0 0 20px 0', fontSize: '14px', lineHeight: '1.6' }}>
+                                                        Configure los activos y periodos de rebalanceo arriba y pulse <strong>"Recalcular"</strong> para ejecutar la simulación.
+                                                    </p>
+                                                    <button
+                                                        onClick={fetchWalkforward}
+                                                        style={{ padding: '10px 24px', background: '#1e3a8a', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600' }}
+                                                    >
+                                                        Ejecutar Simulación
+                                                    </button>
+                                                </div>
+                                            )
+                                        ) : (
+                                            // Matrix Tab
+                                            <div>
+                                                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px', background: '#f9fafb', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                        <label style={{ fontSize: '11px', color: '#666', fontWeight: 'bold' }}>Rango de Rebalanceo (Meses)</label>
+                                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                            <input type="number" value={wfMatrixRebalanceRange.from} onChange={e => setWfMatrixRebalanceRange(p => ({ ...p, from: parseInt(e.target.value) }))} style={{ width: '50px', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }} title="Desde" />
+                                                            <span>a</span>
+                                                            <input type="number" value={wfMatrixRebalanceRange.to} onChange={e => setWfMatrixRebalanceRange(p => ({ ...p, to: parseInt(e.target.value) }))} style={{ width: '50px', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }} title="Hasta" />
+                                                            <span>paso</span>
+                                                            <input type="number" value={wfMatrixRebalanceRange.step} onChange={e => setWfMatrixRebalanceRange(p => ({ ...p, step: parseInt(e.target.value) }))} style={{ width: '40px', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }} title="Paso" />
+                                                        </div>
+                                                    </div>
+
+                                                    <div style={{ borderLeft: '1px solid #cbd5e1' }}></div>
+
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                        <label style={{ fontSize: '11px', color: '#666', fontWeight: 'bold' }}>Objetivo</label>
+                                                        <select
+                                                            value={wfMatrixMetric}
+                                                            onChange={(e) => setWfMatrixMetric(e.target.value)}
+                                                            style={{ padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+                                                        >
+                                                            <option value="sharpe">Max Sharpe Ratio</option>
+                                                            <option value="return">Max Return</option>
+                                                            <option value="maxDD">Min Max Drawdown</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <button
+                                                        onClick={fetchWalkforwardMatrix}
+                                                        disabled={wfMatrixLoading}
+                                                        style={{ padding: '10px 24px', background: '#10b981', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600', marginLeft: 'auto', alignSelf: 'center' }}
+                                                    >
+                                                        {wfMatrixLoading ? 'Optimizando...' : 'Run Matrix'}
+                                                    </button>
+                                                </div>
+
+                                                {wfMatrixLoading ? (
+                                                    <div style={{ padding: '40px', textAlign: 'center' }}>
+                                                        <div className="spinner" style={{ border: '3px solid #f3f3f3', borderTop: '3px solid #10b981', borderRadius: '50%', width: '30px', height: '30px', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
+                                                        <p>Ejecutando cientos de simulaciones, por favor espere...</p>
+                                                    </div>
+                                                ) : wfMatrixData ? (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                                                        <div style={{ height: '400px', width: '100%' }}>
+                                                            <Plot
+                                                                data={[{
+                                                                    x: wfMatrixData.rebalanceValues,
+                                                                    y: wfMatrixData.results.map(r => r[wfMatrixMetric]),
+                                                                    type: 'scatter',
+                                                                    mode: 'lines+markers',
+                                                                    marker: { size: 8, color: '#10b981' },
+                                                                    line: { color: '#10b981', width: 2 }
+                                                                }]}
+                                                                layout={{
+                                                                    title: 'Optimización de Rebalanceo',
+                                                                    autosize: true,
+                                                                    margin: { l: 40, r: 20, b: 40, t: 40 },
+                                                                    xaxis: { title: 'Meses de Rebalanceo' },
+                                                                    yaxis: { title: `Score (${wfMatrixMetric.toUpperCase()})` }
+                                                                }}
+                                                                style={{ width: "100%", height: "100%" }}
+                                                                config={{ responsive: true, displaylogo: false }}
+                                                            />
+                                                        </div>
+
+                                                        <div>
+                                                            <h4 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '12px' }}>Ranking de Configuraciones</h4>
+                                                            <div style={{ overflowX: 'auto', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                                                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                                                    <thead>
+                                                                        <tr style={{ background: '#f8f9fa', color: '#475569', borderBottom: '2px solid #e2e8f0' }}>
+                                                                            <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }}>Rebalanceo (meses)</th>
+                                                                            <th style={{ padding: '12px', textAlign: 'right', cursor: 'pointer' }}>Retorno (%)</th>
+                                                                            <th style={{ padding: '12px', textAlign: 'right', cursor: 'pointer' }}>Max DD (%)</th>
+                                                                            <th style={{ padding: '12px', textAlign: 'right', cursor: 'pointer' }}>Ret/DD (Sharpe)</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {[...wfMatrixData.results].sort((a, b) => b[wfMatrixMetric] - a[wfMatrixMetric]).map((r, idx) => (
+                                                                            <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx === 0 ? '#f0fdf4' : 'transparent' }}>
+                                                                                <td style={{ padding: '12px', textAlign: 'center', fontWeight: '500', color: '#1e3a8a' }}>{r.rebalance}</td>
+                                                                                <td style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: r.return >= 0 ? '#10b981' : '#ef4444' }}>{r.return.toFixed(2)}%</td>
+                                                                                <td style={{ padding: '12px', textAlign: 'right', color: '#ef4444' }}>{r.maxDD.toFixed(2)}%</td>
+                                                                                <td style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold' }}>{r.sharpe.toFixed(2)}</td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ padding: '40px', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0', color: '#334', textAlign: 'center' }}>
+                                                        <h4 style={{ margin: '0 0 10px 0', fontSize: '16px', color: '#047857' }}> Walkforward Matrix Optimization</h4>
+                                                        <p style={{ margin: '0 0 20px 0', fontSize: '14px', lineHeight: '1.6' }}>
+                                                            Ejecute múltiples combinaciones paramétricas de periodos IS (Lookback) y OOS (Rebalanceo) para encontrar la configuración más robusta utilizando un gráfico 3D de rendimiento.
+                                                        </p>
+                                                        <button
+                                                            onClick={fetchWalkforwardMatrix}
+                                                            style={{ padding: '10px 24px', background: '#10b981', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600' }}
+                                                        >
+                                                            Calcular Matriz de Optimización
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
-                                        </div>
-                                    ) : (
-                                        <div style={{ padding: '40px', background: '#f0f4ff', borderRadius: '10px', border: '1px solid #c7d7f8', color: '#334', textAlign: 'center' }}>
-                                            <h4 style={{ margin: '0 0 10px 0', fontSize: '16px', color: '#1e3a8a' }}>⚠️ Configuración Walkforward</h4>
-                                            <p style={{ margin: '0 0 20px 0', fontSize: '14px', lineHeight: '1.6' }}>
-                                                Configure los activos y periodos IS/OOS arriba y pulse <strong>"Recalcular"</strong> para ejecutar la simulación.
-                                            </p>
-                                            <button
-                                                onClick={fetchWalkforward}
-                                                style={{ padding: '10px 24px', background: '#1e3a8a', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600' }}
-                                            >
-                                                Ejecutar Simulación con {wfSource === 'portfolio' ? 'Mi Portfolio' : 'Optimizer Tickers'}
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
+                                        )}
+                                    </div>
+                                )}
                             </>
                         )
                     }

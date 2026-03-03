@@ -2448,7 +2448,8 @@ exports.getCorrelationMatrix = async (req, res) => {
             tickers,
             period,
             matrix,
-            dataPoints: commonGrouped.length - 1
+            dataPoints: commonGrouped.length - 1,
+            rawReturns: metrics
         });
 
     } catch (err) {
@@ -2463,8 +2464,7 @@ exports.getWalkforwardAnalysis = async (req, res) => {
             years = 5,
             initialCapital = 10000,
             benchmark = 'SPY',
-            isMonths = 24, // Lookback for optimization
-            oosMonths = 6  // Rebalance frequency
+            rebalanceMonths = 6  // Rebalance frequency
         } = req.body;
 
         if (!tickers || !Array.isArray(tickers) || tickers.length < 2) {
@@ -2569,16 +2569,14 @@ exports.getWalkforwardAnalysis = async (req, res) => {
         let currentIndex = 0;
 
         // --- BUG FIX & ADJUSTMENT ---
-        // If isMonths is too large for the total data, we must cap it.
-        // Total data in months approx = commonDates.length / 21
         const dataMonths = commonDates.length / 21;
-        let adjustedIsMonths = isMonths;
+        let adjustedIsMonths = 12; // Default 12 month lookback for weights calculation
         if (adjustedIsMonths >= dataMonths - 1) {
-            adjustedIsMonths = Math.floor(dataMonths * 0.5); // Use 50% for IS
-            if (adjustedIsMonths < 3) adjustedIsMonths = 3; // Minimum 3 months
+            adjustedIsMonths = Math.floor(dataMonths * 0.5); // Use 50% for lookback
+            if (adjustedIsMonths < 3) adjustedIsMonths = 3;
         }
 
-        // Find first possible OOS start (must have adjustedIsMonths before it)
+        // Find first possible Rebalance start 
         const firstOOSDate = new Date(commonDates[0]);
         firstOOSDate.setMonth(firstOOSDate.getMonth() + adjustedIsMonths);
 
@@ -2598,13 +2596,18 @@ exports.getWalkforwardAnalysis = async (req, res) => {
         let staticEquity = [initialCapital];
         const staticShares = tickers.map((t, idx) => (initialCapital * staticWeights[idx]) / priceMap[commonDates[oosStartIndex]][t]);
 
+        // --- BASELINE (EQUAL WEIGHT) CALCULATION ---
+        const baselineWeights = tickers.map(() => 1 / tickers.length);
+        let baselineEquity = [initialCapital];
+        const baselineShares = tickers.map((t, idx) => (initialCapital * baselineWeights[idx]) / priceMap[commonDates[oosStartIndex]][t]);
+
         while (oosStartIndex < commonDates.length - 1) {
             const oosStart = commonDates[oosStartIndex];
-            let oosEndIndex = oosStartIndex + (oosMonths * 21); // Approx 21 trading days per month
+            let oosEndIndex = oosStartIndex + (rebalanceMonths * 21); // Approx 21 trading days per month
             if (oosEndIndex >= commonDates.length) oosEndIndex = commonDates.length - 1;
             const oosEnd = commonDates[oosEndIndex];
 
-            // IS is the chunk BEFORE OOS
+            // Lookback Period (IS)
             const isEndDate = commonDates[oosStartIndex - 1];
             const isStartDateObj = new Date(isEndDate);
             isStartDateObj.setMonth(isStartDateObj.getMonth() - adjustedIsMonths);
@@ -2621,8 +2624,9 @@ exports.getWalkforwardAnalysis = async (req, res) => {
                 oosPeriod: `${oosStart} - ${oosEnd}`,
                 daysIS: isPerf.days,
                 daysOOS: oosPerf.days,
-                netProfitIS: isPerf.netProfit,
-                netProfitOOS: oosPerf.netProfit,
+                netProfitIS: (isPerf.netProfit / 10000) * 100, // Return as %
+                netProfitOOS: (oosPerf.netProfit / currentCap) * 100, // Return as %
+                accumulatedReturn: ((oosPerf.endCap - initialCapital) / initialCapital) * 100,
                 weights: Object.fromEntries(tickers.map((t, idx) => [t, weights[idx]]))
             });
 
@@ -2638,6 +2642,9 @@ exports.getWalkforwardAnalysis = async (req, res) => {
                 staticEquity.push(sVal);
                 // Benchmark
                 benchEquity.push(benchShares * priceMap[d][benchmark]);
+                // Baseline
+                const bVal = tickers.reduce((sum, t, idx) => sum + baselineShares[idx] * priceMap[d][t], 0);
+                baselineEquity.push(bVal);
                 suiteDates.push(d);
             }
 
@@ -2667,6 +2674,7 @@ exports.getWalkforwardAnalysis = async (req, res) => {
             portfolioEquity: suiteEquity,
             staticEquity: staticEquity,
             benchmarkEquity: benchEquity,
+            baselineEquity: baselineEquity,
             windows,
             metrics: {
                 portfolioReturn: stratRet,
@@ -2678,7 +2686,134 @@ exports.getWalkforwardAnalysis = async (req, res) => {
         });
 
     } catch (err) {
-        console.error("Walkforward Error:", err);
-        res.status(500).json({ error: "Walkforward failed", details: err.message });
+        console.error(err);
+        res.status(500).json({ error: "Failed to run walkforward", details: err.message });
+    }
+};
+
+exports.getWalkforwardMatrix = async (req, res) => {
+    try {
+        const {
+            tickers,
+            years = 5,
+            benchmark = 'SPY',
+            rebalanceRange = { from: 1, to: 12, step: 1 },
+            metric = 'sharpe' // 'sharpe', 'return', 'retDrawdown'
+        } = req.body;
+
+        const yahooFinance = new YahooFinance();
+        const end = new Date();
+        const start = new Date();
+        start.setFullYear(end.getFullYear() - parseInt(years));
+        const period1 = start.toISOString().split('T')[0];
+        const period2 = end.toISOString().split('T')[0];
+
+        const allSymbols = [...new Set([...tickers, benchmark])];
+        const historyPromises = allSymbols.map(async t => {
+            return await yahooFinance.historical(t, { period1, period2, interval: '1d' }).catch(() => []);
+        });
+        const historyResults = await Promise.all(historyPromises);
+
+        const priceMap = {};
+        const validDatesSet = new Set();
+        historyResults.forEach((hist, i) => {
+            const sym = allSymbols[i];
+            hist.forEach(day => {
+                const dateStr = day.date.toISOString().split('T')[0];
+                if (!priceMap[dateStr]) priceMap[dateStr] = {};
+                priceMap[dateStr][sym] = day.adjClose;
+                validDatesSet.add(dateStr);
+            });
+        });
+
+        const commonDates = Array.from(validDatesSet).sort().filter(d =>
+            tickers.every(t => priceMap[d][t] !== undefined) && priceMap[d][benchmark] !== undefined
+        );
+
+        if (commonDates.length < 60) return res.status(400).json({ error: "Insufficient data." });
+
+        const results = [];
+        const rebalanceValues = [];
+        for (let v = rebalanceRange.from; v <= rebalanceRange.to; v += rebalanceRange.step) rebalanceValues.push(v);
+
+        // Optimization engine (reused logic simplified for speed)
+        const runWFSingle = (rebalanceMonths) => {
+            let currentCap = 10000;
+            const dataMonths = commonDates.length / 21;
+            let adjustedIsMonths = 12; // Default 12 month lookback for weights calculation
+            if (adjustedIsMonths >= dataMonths - 1) {
+                adjustedIsMonths = Math.floor(dataMonths * 0.5); // Use 50% for lookback
+                if (adjustedIsMonths < 3) adjustedIsMonths = 3;
+            }
+            let oosStartIndex = commonDates.findIndex(d => {
+                const start = new Date(commonDates[0]);
+                start.setMonth(start.getMonth() + adjustedIsMonths);
+                return d >= start.toISOString().split('T')[0];
+            });
+
+            if (oosStartIndex === -1 || oosStartIndex >= commonDates.length - 10) return null;
+
+            const eq = [10000];
+            while (oosStartIndex < commonDates.length - 1) {
+                const oosStart = commonDates[oosStartIndex];
+                let oosEndIndex = oosStartIndex + (rebalanceMonths * 21);
+                if (oosEndIndex >= commonDates.length) oosEndIndex = commonDates.length - 1;
+                const oosEnd = commonDates[oosEndIndex];
+
+                const isEnd = commonDates[oosStartIndex - 1];
+                const isStartObj = new Date(isEnd);
+                isStartObj.setMonth(isStartObj.getMonth() - adjustedIsMonths);
+                const isStart = isStartObj.toISOString().split('T')[0];
+
+                const isRangeDates = commonDates.filter(d => d >= isStart && d <= isEnd);
+                if (isRangeDates.length < 10) break;
+
+                // Fast Random optimization
+                const returns = [];
+                for (let i = 1; i < isRangeDates.length; i++) {
+                    const t1 = isRangeDates[i], t0 = isRangeDates[i - 1];
+                    returns.push(tickers.map(t => (priceMap[t1][t] - priceMap[t0][t]) / priceMap[t0][t]));
+                }
+
+                let bestS = -Infinity, bestW = null;
+                for (let i = 0; i < 500; i++) {
+                    let w = tickers.map(() => Math.random());
+                    const s = w.reduce((a, b) => a + b, 0); w = w.map(v => v / s);
+                    const pr = returns.map(r => r.reduce((acc, val, idx) => acc + val * w[idx], 0));
+                    const m = pr.reduce((a, b) => a + b, 0) / pr.length;
+                    const sd = Math.sqrt(pr.reduce((a, v) => a + Math.pow(v - m, 2), 0) / pr.length);
+                    const sh = m / (sd || 0.001);
+                    if (sh > bestS) { bestS = sh; bestW = w; }
+                }
+
+                if (!bestW) break;
+
+                const shares = tickers.map((t, i) => (currentCap * bestW[i]) / priceMap[oosStart][t]);
+                for (let i = oosStartIndex + 1; i <= oosEndIndex; i++) {
+                    eq.push(tickers.reduce((sum, t, idx) => sum + shares[idx] * priceMap[commonDates[i]][t], 0));
+                }
+                currentCap = eq[eq.length - 1];
+                oosStartIndex = oosEndIndex;
+            }
+
+            const totalRet = (currentCap - 10000) / 10000;
+            let maxP = eq[0], maxDD = 0;
+            eq.forEach(v => { if (v > maxP) maxP = v; const dd = (v - maxP) / maxP; if (dd < maxDD) maxDD = dd; });
+            const mean = totalRet / (eq.length / 252); // Approx annual
+
+            return { return: totalRet * 100, maxDD: Math.abs(maxDD) * 100, sharpe: (totalRet * 100) / (Math.abs(maxDD) * 100 || 1), retDrawdown: (totalRet * 100) / (Math.abs(maxDD) * 100 || 1) };
+        };
+
+        for (const rebalance of rebalanceValues) {
+            const res = runWFSingle(rebalance);
+            if (res) {
+                results.push({ rebalance, ...res });
+            }
+        }
+
+        res.json({ rebalanceValues, results });
+
+    } catch (err) {
+        res.status(500).json({ error: "Matrix calculation failed", details: err.message });
     }
 };
