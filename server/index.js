@@ -20,7 +20,7 @@ const financeRoutes = require('./routes/financeRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 
 app.use('/api/accounts', accountRoutes);
-app.use('/api', financeRoutes);
+app.use('/api', financeRoutes); // Mount at root /api to let it handle /transactions and /investments
 app.use('/api/reports', reportRoutes);
 
 

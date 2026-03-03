@@ -2,6 +2,7 @@ const db = require('../db');
 const YahooFinance = require('yahoo-finance2').default;
 const fs = require('fs');
 const path = require('path');
+const { exec } = require('child_process');
 
 // Seeded Random Generator for deterministic results
 const seededRandom = (seed) => {
@@ -2577,9 +2578,9 @@ exports.getWalkforwardAnalysis = async (req, res) => {
         };
 
         const windows = [];
-        let suiteEquity = [initialCapital];
-        let benchEquity = [initialCapital];
-        let suiteDates = [commonDates[0]];
+        let suiteEquity = [];
+        let benchEquity = [];
+        let suiteDates = [];
 
         // Define Start and End indices
         let currentIndex = 0;
@@ -2603,6 +2604,11 @@ exports.getWalkforwardAnalysis = async (req, res) => {
         let currentCap = initialCapital;
         let currentBenchCap = initialCapital;
         const benchShares = initialCapital / priceMap[commonDates[oosStartIndex]][benchmark];
+
+        // Ensure we start equity tracking from the first OOS date
+        suiteEquity = [initialCapital];
+        benchEquity = [initialCapital];
+        suiteDates = [commonDates[oosStartIndex]];
 
         // --- STATIC COMPARISON CALCULATION ---
         // Optimize once at the very start of the walkforward period
@@ -2653,39 +2659,42 @@ exports.getWalkforwardAnalysis = async (req, res) => {
 
                 let shouldRebalance = false;
 
-                // Evaluate Dynamic Triggers
-                if (rebalanceType === 'months') {
-                    if (i - oosStartIndex >= finalRebalanceValue * 21) {
-                        shouldRebalance = true;
-                    }
-                } else if (rebalanceType === 'profit') {
-                    if (assetsTrigger === 0) {
-                        // Whole portfolio: rebalance when portfolio gain >= target
-                        const profitPct = ((dayCap - startCap) / startCap) * 100;
-                        if (profitPct >= finalRebalanceValue) {
+                // Evaluate Dynamic Triggers - with minimum 5 day period to avoid infinite loops/hangs
+                const daysInWindow = i - oosStartIndex;
+                if (daysInWindow >= 5) {
+                    if (rebalanceType === 'months') {
+                        if (daysInWindow >= finalRebalanceValue * 21) {
                             shouldRebalance = true;
                         }
-                    } else {
-                        // N assets trigger: rebalance when at least assetsTrigger assets have gained >= target
-                        let assetsThatTriggered = 0;
-                        for (let j = 0; j < tickers.length; j++) {
-                            const assetStartPrice = priceMap[oosStart][tickers[j]];
-                            const assetCurrentPrice = priceMap[d][tickers[j]];
-                            const assetGainPct = ((assetCurrentPrice - assetStartPrice) / assetStartPrice) * 100;
-                            if (assetGainPct >= finalRebalanceValue) {
-                                assetsThatTriggered++;
+                    } else if (rebalanceType === 'profit') {
+                        if (assetsTrigger === 0) {
+                            // Whole portfolio: rebalance when portfolio gain >= target
+                            const profitPct = ((dayCap - startCap) / startCap) * 100;
+                            if (profitPct >= finalRebalanceValue && finalRebalanceValue > 0) {
+                                shouldRebalance = true;
+                            }
+                        } else {
+                            // N assets trigger: rebalance when at least assetsTrigger assets have gained >= target
+                            let assetsThatTriggered = 0;
+                            for (let j = 0; j < tickers.length; j++) {
+                                const assetStartPrice = priceMap[oosStart][tickers[j]];
+                                const assetCurrentPrice = priceMap[d][tickers[j]];
+                                const assetGainPct = ((assetCurrentPrice - assetStartPrice) / assetStartPrice) * 100;
+                                if (assetGainPct >= finalRebalanceValue && finalRebalanceValue > 0) {
+                                    assetsThatTriggered++;
+                                }
+                            }
+                            if (assetsThatTriggered >= assetsTrigger) {
+                                shouldRebalance = true;
                             }
                         }
-                        if (assetsThatTriggered >= assetsTrigger) {
-                            shouldRebalance = true;
-                        }
-                    }
-                } else if (rebalanceType === 'deviation') {
-                    for (let j = 0; j < tickers.length; j++) {
-                        const currentWeight = (shares[j] * priceMap[d][tickers[j]]) / dayCap;
-                        if (Math.abs(currentWeight - weights[j]) * 100 >= finalRebalanceValue) {
-                            shouldRebalance = true;
-                            break;
+                    } else if (rebalanceType === 'deviation') {
+                        for (let j = 0; j < tickers.length; j++) {
+                            const currentWeight = (shares[j] * priceMap[d][tickers[j]]) / dayCap;
+                            if (Math.abs(currentWeight - weights[j]) * 100 >= finalRebalanceValue && finalRebalanceValue > 0) {
+                                shouldRebalance = true;
+                                break;
+                            }
                         }
                     }
                 }
@@ -2727,6 +2736,10 @@ exports.getWalkforwardAnalysis = async (req, res) => {
             return maxDD;
         };
 
+        const totalDays = suiteDates.length;
+        const yearsNum = totalDays / 252;
+        const calculateCAGR = (ret) => Math.pow(1 + ret, 1 / (yearsNum || 1)) - 1;
+
         res.json({
             dates: suiteDates,
             portfolioEquity: suiteEquity,
@@ -2736,8 +2749,11 @@ exports.getWalkforwardAnalysis = async (req, res) => {
             windows,
             metrics: {
                 portfolioReturn: stratRet,
+                portfolioCAGR: calculateCAGR(stratRet),
                 staticReturn: staticRet,
+                staticCAGR: calculateCAGR(staticRet),
                 benchmarkReturn: benchRet,
+                benchmarkCAGR: calculateCAGR(benchRet),
                 portfolioMaxDrawdown: getMaxDrawdown(suiteEquity),
                 benchmarkMaxDrawdown: getMaxDrawdown(benchEquity)
             }
@@ -2871,39 +2887,42 @@ exports.getWalkforwardMatrix = async (req, res) => {
                     currentCap = dayCap;
                     let shouldRebalance = false;
 
-                    if (wfMatrixRebalanceType === 'months') {
-                        if (i - oosStartIndex >= rebalanceValue * 21) shouldRebalance = true;
-                    } else if (wfMatrixRebalanceType === 'profit') {
-                        if (assetsTrigger === 0) {
-                            const profitPct = ((dayCap - startCap) / startCap) * 100;
-                            if (profitPct >= rebalanceValue) shouldRebalance = true;
-                        } else {
-                            let assetsHit = 0;
-                            for (let j = 0; j < tickers.length; j++) {
-                                const assetStart = shares[j] * priceMap[oosStart][tickers[j]];
-                                const assetNow = shares[j] * priceMap[d][tickers[j]];
-                                const assetPct = ((assetNow - assetStart) / assetStart) * 100;
-                                if (assetPct >= rebalanceValue) assetsHit++;
+                    const daysInWindow = i - oosStartIndex;
+                    if (daysInWindow >= 5) {
+                        if (wfMatrixRebalanceType === 'months') {
+                            if (daysInWindow >= rebalanceValue * 21) shouldRebalance = true;
+                        } else if (wfMatrixRebalanceType === 'profit') {
+                            if (assetsTrigger === 0) {
+                                const profitPct = ((dayCap - startCap) / startCap) * 100;
+                                if (profitPct >= rebalanceValue && rebalanceValue > 0) shouldRebalance = true;
+                            } else {
+                                let assetsHit = 0;
+                                for (let j = 0; j < tickers.length; j++) {
+                                    const assetStart = priceMap[oosStart][tickers[j]];
+                                    const assetNow = priceMap[d][tickers[j]];
+                                    const assetPct = ((assetNow - assetStart) / assetStart) * 100;
+                                    if (assetPct >= rebalanceValue && rebalanceValue > 0) assetsHit++;
+                                }
+                                if (assetsHit >= assetsTrigger) shouldRebalance = true;
                             }
-                            if (assetsHit >= assetsTrigger) shouldRebalance = true;
-                        }
-                    } else if (wfMatrixRebalanceType === 'deviation') {
-                        if (assetsTrigger === 0) {
-                            // Deviation for the whole portfolio doesn't make logical sense, we treat 0 as 1 for deviation
-                            let maxDev = 0;
-                            for (let j = 0; j < tickers.length; j++) {
-                                const currentWeight = (shares[j] * priceMap[d][tickers[j]]) / dayCap;
-                                const dev = Math.abs(currentWeight - bestW[j]) * 100;
-                                if (dev > maxDev) maxDev = dev;
+                        } else if (wfMatrixRebalanceType === 'deviation') {
+                            if (assetsTrigger === 0) {
+                                // Deviation for the whole portfolio doesn't make logical sense, we treat 0 as 1 for deviation
+                                let maxDev = 0;
+                                for (let j = 0; j < tickers.length; j++) {
+                                    const currentWeight = (shares[j] * priceMap[d][tickers[j]]) / dayCap;
+                                    const dev = Math.abs(currentWeight - bestW[j]) * 100;
+                                    if (dev > maxDev) maxDev = dev;
+                                }
+                                if (maxDev >= rebalanceValue && rebalanceValue > 0) shouldRebalance = true;
+                            } else {
+                                let assetsHit = 0;
+                                for (let j = 0; j < tickers.length; j++) {
+                                    const currentWeight = (shares[j] * priceMap[d][tickers[j]]) / dayCap;
+                                    if (Math.abs(currentWeight - bestW[j]) * 100 >= rebalanceValue && rebalanceValue > 0) assetsHit++;
+                                }
+                                if (assetsHit >= assetsTrigger) shouldRebalance = true;
                             }
-                            if (maxDev >= rebalanceValue) shouldRebalance = true;
-                        } else {
-                            let assetsHit = 0;
-                            for (let j = 0; j < tickers.length; j++) {
-                                const currentWeight = (shares[j] * priceMap[d][tickers[j]]) / dayCap;
-                                if (Math.abs(currentWeight - bestW[j]) * 100 >= rebalanceValue) assetsHit++;
-                            }
-                            if (assetsHit >= assetsTrigger) shouldRebalance = true;
                         }
                     }
 
@@ -2918,7 +2937,12 @@ exports.getWalkforwardMatrix = async (req, res) => {
             let maxP = eq[0], maxDD = 0;
             eq.forEach(v => { if (v > maxP) maxP = v; const dd = (v - maxP) / maxP; if (dd < maxDD) maxDD = dd; });
 
-            return { return: totalRet * 100, maxDD: Math.abs(maxDD) * 100, sharpe: (totalRet * 100) / (Math.abs(maxDD) * 100 || 1) };
+            const sharpe = (totalRet * 100) / (Math.abs(maxDD) * 100 || 1);
+            return {
+                return: isNaN(totalRet) ? 0 : totalRet * 100,
+                maxDD: isNaN(maxDD) ? 0 : Math.abs(maxDD) * 100,
+                sharpe: isNaN(sharpe) ? 0 : sharpe
+            };
         };
 
         const results = [];
@@ -2948,5 +2972,54 @@ exports.getWalkforwardMatrix = async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: "Matrix calculation failed", details: err.message });
+    }
+};
+
+exports.getSeabornPairplot = async (req, res) => {
+    try {
+        const { returns } = req.body; // Map of { AAPL: [0.01, -0.02], ... }
+        if (!returns || Object.keys(returns).length < 2) {
+            return res.status(400).json({ error: "Insufficient data for pairplot" });
+        }
+
+        // 1. Create temporary CSV
+        const tickers = Object.keys(returns);
+        const length = returns[tickers[0]].length;
+        let csvContent = tickers.join(',') + '\n';
+        for (let i = 0; i < length; i++) {
+            const row = tickers.map(t => returns[t][i] || 0);
+            csvContent += row.join(',') + '\n';
+        }
+
+        const tempPath = path.join(__dirname, `../../tmp/returns_${Date.now()}.csv`);
+        const tempDir = path.dirname(tempPath);
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+        fs.writeFileSync(tempPath, csvContent);
+
+        // 2. Run Python script
+        const scriptPath = path.join(__dirname, '../scripts/pairplot.py');
+        exec(`python "${scriptPath}" "${tempPath}"`, (error, stdout, stderr) => {
+            // Cleanup temp file
+            if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+
+            if (error) {
+                console.error("Python error:", stderr);
+                return res.status(500).json({ error: "Failed to generate pairplot", details: stderr });
+            }
+
+            try {
+                const result = JSON.parse(stdout);
+                if (result.error) {
+                    return res.status(500).json({ error: result.error });
+                }
+                res.json({ image: result.image });
+            } catch (e) {
+                res.status(500).json({ error: "Failed to parse Python output", details: stdout });
+            }
+        });
+
+    } catch (err) {
+        console.error("Seaborn Error:", err);
+        res.status(500).json({ error: err.message });
     }
 };
