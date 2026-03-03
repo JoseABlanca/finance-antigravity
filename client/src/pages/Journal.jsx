@@ -196,6 +196,24 @@ const Journal = () => {
         displayTxId: txIdToSequentialId[entry.txId]
     }));
 
+    // Calculate totals for the filtered view
+    const historyTotalDebit = finalEntries.reduce((sum, e) => sum + (parseFloat(e.debit) || 0), 0);
+    const historyTotalCredit = finalEntries.reduce((sum, e) => sum + (parseFloat(e.credit) || 0), 0);
+    const historyIsBalanced = Math.abs(historyTotalDebit - historyTotalCredit) < 0.01;
+
+    // Calculate daily totals for the summary
+    const dailyTotals = finalEntries.reduce((acc, entry) => {
+        const date = entry.txDate;
+        if (!acc[date]) {
+            acc[date] = { date, debit: 0, credit: 0 };
+        }
+        acc[date].debit += (parseFloat(entry.debit) || 0);
+        acc[date].credit += (parseFloat(entry.credit) || 0);
+        return acc;
+    }, {});
+
+    const dailyTotalsArray = Object.values(dailyTotals).sort((a, b) => new Date(a.date) - new Date(b.date));
+
     const handleEditEntry = (entry) => {
         setEditingId(entry.txId);
         const tx = transactions.find(t => t.id === entry.txId);
@@ -411,7 +429,7 @@ const Journal = () => {
                                             <SearchableSelect
                                                 options={selectableAccounts.map(a => ({
                                                     value: a.id,
-                                                    label: `${a.code} - ${a.name} (${a.type === 'ASSET' ? 'Activo' : a.type === 'LIABILITY' ? 'Pasivo' : a.type === 'REVENUE' ? 'Ingreso' : 'Gasto'})`
+                                                    label: `${a.code} - ${a.name} (${a.type === 'ASSET' ? 'Activo' : a.type === 'LIABILITY' ? 'Pasivo' : a.type === 'EQUITY' ? 'Patrimonio' : a.type === 'REVENUE' ? 'Ingreso' : 'Gasto'})`
                                                 }))}
                                                 value={line.account_id}
                                                 onChange={(val) => handleLineChange(idx, 'account_id', val)}
@@ -472,6 +490,58 @@ const Journal = () => {
                     </form>
                 </div>
             )}
+
+            <div className="card" style={{ marginBottom: '24px' }}>
+                <h3 style={{ marginBottom: '16px' }}>Resumen Diario (Cuadre)</h3>
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <thead>
+                            <tr style={{ background: '#f8f9fa', borderBottom: '2px solid #eee' }}>
+                                <th style={{ padding: '8px', textAlign: 'left' }}>Fecha</th>
+                                <th style={{ padding: '8px', textAlign: 'right' }}>Total Debe</th>
+                                <th style={{ padding: '8px', textAlign: 'right' }}>Total Haber</th>
+                                <th style={{ padding: '8px', textAlign: 'center' }}>Diferencia</th>
+                                <th style={{ padding: '8px', textAlign: 'center' }}>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {dailyTotalsArray.map(day => {
+                                const diff = day.debit - day.credit;
+                                const isDayBalanced = Math.abs(diff) < 0.01;
+                                let statusLabel = "CUADRE";
+                                let statusColor = "#059669"; // Green
+
+                                if (diff > 0.01) {
+                                    statusLabel = "Saldo Deudor";
+                                    statusColor = "#dc2626"; // Red
+                                } else if (diff < -0.01) {
+                                    statusLabel = "Saldo Acreedor";
+                                    statusColor = "#dc2626"; // Red
+                                }
+
+                                return (
+                                    <tr key={day.date} style={{ borderBottom: '1px solid #eee' }}>
+                                        <td style={{ padding: '8px' }}>{format(new Date(day.date), 'dd/MM/yyyy')}</td>
+                                        <td style={{ padding: '8px', textAlign: 'right' }}>€{day.debit.toLocaleString('de-DE', { minimumFractionDigits: 2 })}</td>
+                                        <td style={{ padding: '8px', textAlign: 'right' }}>€{day.credit.toLocaleString('de-DE', { minimumFractionDigits: 2 })}</td>
+                                        <td style={{ padding: '8px', textAlign: 'right', color: isDayBalanced ? '#666' : '#dc2626', fontWeight: isDayBalanced ? 'normal' : 'bold' }}>
+                                            {isDayBalanced ? '-' : `€${Math.abs(diff).toLocaleString('de-DE', { minimumFractionDigits: 2 })}`}
+                                        </td>
+                                        <td style={{ padding: '8px', textAlign: 'center' }}>
+                                            <span style={{ color: statusColor, fontWeight: 'bold' }}>{statusLabel}</span>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {dailyTotalsArray.length === 0 && (
+                                <tr>
+                                    <td colSpan="5" style={{ padding: '16px', textAlign: 'center', color: '#999' }}>No hay datos para mostrar</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
             <div className="card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -582,6 +652,24 @@ const Journal = () => {
                             );
                         })}
                     </tbody>
+                    <tfoot>
+                        <tr style={{ background: '#f1f5f9', fontWeight: 'bold', borderTop: '2px solid #cbd5e1' }}>
+                            <td colSpan="7" style={{ padding: '12px', textAlign: 'right', fontSize: '14px' }}>TOTALES FILTRADOS:</td>
+                            <td style={{ padding: '12px', textAlign: 'right', fontSize: '14px', color: historyIsBalanced ? '#059669' : '#dc2626' }}>
+                                €{historyTotalDebit.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'right', fontSize: '14px', color: historyIsBalanced ? '#059669' : '#dc2626' }}>
+                                €{historyTotalCredit.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>
+                                {historyIsBalanced ? (
+                                    <span style={{ color: '#059669', fontSize: '12px' }}>Cuadrado ✓</span>
+                                ) : (
+                                    <span style={{ color: '#dc2626', fontSize: '12px' }}>Descuadrado ✗</span>
+                                )}
+                            </td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
         </div>

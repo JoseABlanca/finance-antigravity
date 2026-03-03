@@ -6,16 +6,21 @@ const getPeriodRange = (year, period) => {
     if (!period || period === 'ANNUAL') {
         return { start: `${year}-01-01`, end: `${year}-12-31`, label: `${year}` };
     }
-    const qMap = {
-        'Q1': { start: `${year}-01-01`, end: `${year}-03-31`, label: `Q1 ${year}` },
-        'Q2': { start: `${year}-04-01`, end: `${year}-06-30`, label: `Q2 ${year}` },
-        'Q3': { start: `${year}-07-01`, end: `${year}-09-30`, label: `Q3 ${year}` },
-        'Q4': { start: `${year}-10-01`, end: `${year}-12-31`, label: `Q4 ${year}` }
-    };
-    return qMap[period.toUpperCase()] || { start: `${year}-01-01`, end: `${year}-12-31`, label: `${year}` };
+    if (period.startsWith('M')) {
+        const monthNum = period.substring(1).padStart(2, '0');
+        const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+        const monthIdx = parseInt(monthNum) - 1;
+        const lastDay = new Date(year, parseInt(monthNum), 0).getDate();
+        return {
+            start: `${year}-${monthNum}-01`,
+            end: `${year}-${monthNum}-${lastDay}`,
+            label: `${months[monthIdx]} ${year}`
+        };
+    }
+    return { start: `${year}-01-01`, end: `${year}-12-31`, label: `${year}` };
 };
 
-const getComparisonPeriods = (year, period, count = 4) => {
+const getComparisonPeriods = (year, period, count = 1) => { // Default to 1 if no comparison
     let periods = [];
     let currentYear = parseInt(year);
 
@@ -24,34 +29,28 @@ const getComparisonPeriods = (year, period, count = 4) => {
             periods.push(getPeriodRange(currentYear - i, 'ANNUAL'));
         }
     } else {
-        const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
         let targetPeriod = period.toUpperCase();
+        let mIdx = 11; // Default to Dec
 
-        if (targetPeriod === 'QUARTERLY') {
+        if (targetPeriod === 'MONTHLY') {
             const now = new Date();
             const nowYear = now.getFullYear();
             if (nowYear === currentYear) {
-                const month = now.getMonth() + 1;
-                if (month <= 3) targetPeriod = 'Q1';
-                else if (month <= 6) targetPeriod = 'Q2';
-                else if (month <= 9) targetPeriod = 'Q3';
-                else targetPeriod = 'Q4';
-            } else {
-                targetPeriod = 'Q4';
+                mIdx = now.getMonth();
             }
+        } else if (targetPeriod.startsWith('M')) {
+            mIdx = parseInt(targetPeriod.substring(1)) - 1;
         }
 
-        let qIdx = quarters.indexOf(targetPeriod);
-        if (qIdx === -1) qIdx = 3; // Default to Q4
-
         for (let i = count - 1; i >= 0; i--) {
-            let targetQIdx = qIdx - i;
+            let targetMIdx = mIdx - i;
             let targetYear = currentYear;
-            while (targetQIdx < 0) {
-                targetQIdx += 4;
+            while (targetMIdx < 0) {
+                targetMIdx += 12;
                 targetYear -= 1;
             }
-            periods.push(getPeriodRange(targetYear, quarters[targetQIdx]));
+            const mStr = `M${String(targetMIdx + 1).padStart(2, '0')}`;
+            periods.push(getPeriodRange(targetYear, mStr));
         }
     }
     return periods;
@@ -148,7 +147,7 @@ exports.getBalanceSheet = (req, res) => {
     if (!year) return res.status(400).json({ error: 'Year is required' });
 
     try {
-        const periods = comparison === 'true' ? getComparisonPeriods(year, period) : [getPeriodRange(year, period)];
+        const periods = comparison === 'true' ? getComparisonPeriods(year, period, 6) : [getPeriodRange(year, period)];
 
         const results = periods.map(p => {
             const stmt = db.prepare(`
@@ -182,7 +181,7 @@ exports.getProfitAndLoss = (req, res) => {
     if (!year) return res.status(400).json({ error: 'Year is required' });
 
     try {
-        const periods = comparison === 'true' ? getComparisonPeriods(year, period) : [getPeriodRange(year, period)];
+        const periods = comparison === 'true' ? getComparisonPeriods(year, period, 6) : [getPeriodRange(year, period)];
 
         const results = periods.map(p => {
             const stmt = db.prepare(`
@@ -246,12 +245,14 @@ exports.getCashFlow = (req, res) => {
 };
 
 exports.getFinancialTrends = (req, res) => {
-    const { type } = req.query; // 'ANNUAL' or 'QUARTERLY'
-    const limit = type === 'QUARTERLY' ? 8 : 5;
+    const { type } = req.query; // 'ANNUAL', 'QUARTERLY', 'MONTHLY'
+    const limit = type === 'MONTHLY' ? 12 : type === 'QUARTERLY' ? 8 : 5;
 
     try {
-        const periodFormat = type === 'QUARTERLY' ?
-            `CASE 
+        const periodFormat = type === 'MONTHLY' ?
+            `strftime('%Y-%m', t.date)` :
+            type === 'QUARTERLY' ?
+                `CASE 
                 WHEN strftime('%m', t.date) BETWEEN '01' AND '03' THEN strftime('%Y', t.date) || '-Q1'
                 WHEN strftime('%m', t.date) BETWEEN '04' AND '06' THEN strftime('%Y', t.date) || '-Q2'
                 WHEN strftime('%m', t.date) BETWEEN '07' AND '09' THEN strftime('%Y', t.date) || '-Q3'

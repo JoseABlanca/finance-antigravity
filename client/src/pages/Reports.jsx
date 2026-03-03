@@ -8,10 +8,18 @@ const Reports = () => {
     const [period, setPeriod] = useState('ANNUAL'); // 'ANNUAL', 'Q1', 'Q2', 'Q3', 'Q4'
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [showComparison, setShowComparison] = useState(false);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     useEffect(() => {
         fetchData();
-    }, [activeTab, year, period]);
+    }, [activeTab, year, period, showComparison]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -20,7 +28,7 @@ const Reports = () => {
             if (activeTab === 'pnl') endpoint = '/reports/profit-loss';
             if (activeTab === 'cashflow') endpoint = '/reports/cash-flow';
 
-            const res = await api.get(`${endpoint}?year=${year}&period=${period}&comparison=true`);
+            const res = await api.get(`${endpoint}?year=${year}&period=${period}&comparison=${showComparison}`);
             setData(res.data);
         } catch (err) {
             console.error(err);
@@ -104,8 +112,6 @@ const Reports = () => {
 
         results.forEach((periodData, pIdx) => {
             const relevantAccounts = periodData.accounts.filter(a => {
-                if (type === 'ASSET') return a.type === 'ASSET';
-                if (type === 'LIABILITY') return a.type === 'LIABILITY' || a.type === 'EQUITY';
                 return a.type === type;
             });
 
@@ -121,8 +127,6 @@ const Reports = () => {
             });
         });
 
-        // Skip separate EQUITY section as it's merged with LIABILITY
-        if (type === 'EQUITY') return null;
 
         const allAccounts = Object.values(accountMap);
         if (allAccounts.length === 0) return null;
@@ -173,20 +177,23 @@ const Reports = () => {
                 <>
                     <tr style={{ borderBottom: '1px solid #f5f5f5' }}>
                         <td style={{
-                            padding: '8px 0 8px 16px',
-                            paddingLeft: `${16 + level * 20}px`,
+                            padding: isMobile ? '4px 0 4px 8px' : '8px 0 8px 16px',
+                            paddingLeft: `${(isMobile ? 4 : 16) + level * (isMobile ? 6 : 20)}px`,
                             fontWeight: isBold ? 'bold' : 'normal',
                             color: isBold ? '#333' : '#666',
-                            fontSize: level === 0 ? '1.1em' : '1em'
+                            fontSize: level === 0 ? (isMobile ? '0.75rem' : '1.1em') : (isMobile ? '0.65rem' : '1em'),
+                            textAlign: 'left'
                         }}>
                             {account.name}
                         </td>
                         {account.periodTotals.map((total, i) => (
                             <td key={i} style={{
-                                padding: '8px 12px',
+                                padding: isMobile ? '2px 4px' : '8px 12px',
                                 textAlign: 'right',
                                 fontWeight: isBold ? 'bold' : 'normal',
-                                color: isBold ? '#333' : '#666'
+                                color: isBold ? '#333' : '#666',
+                                fontSize: isMobile ? '0.65rem' : '1rem',
+                                whiteSpace: 'nowrap'
                             }}>
                                 {formatCurrency(total).replace('€', '').trim()}
                             </td>
@@ -206,13 +213,14 @@ const Reports = () => {
                             {periods.map((p, i) => (
                                 <th key={i} style={{
                                     textAlign: 'right',
-                                    padding: '16px 12px',
-                                    minWidth: '120px',
+                                    padding: isMobile ? '4px 2px' : '16px 12px',
+                                    minWidth: isMobile ? '50px' : '120px',
                                     textTransform: 'uppercase',
-                                    fontSize: '1rem',
+                                    fontSize: isMobile ? '0.6rem' : '1rem',
                                     color: '#000',
                                     fontWeight: '900',
-                                    borderBottom: '2px solid #000'
+                                    borderBottom: '2px solid #000',
+                                    whiteSpace: 'nowrap'
                                 }}>
                                     {p}
                                 </th>
@@ -221,21 +229,23 @@ const Reports = () => {
                         {/* Main Group Header Row with Totals */}
                         <tr style={{ borderBottom: '1px solid #000' }}>
                             <td style={{
-                                padding: '16px 0',
+                                padding: isMobile ? '4px 0' : '16px 0',
                                 fontWeight: '900',
-                                fontSize: '1.2rem',
+                                fontSize: isMobile ? '0.75rem' : '1.2rem',
                                 color: '#000',
-                                textTransform: 'uppercase'
+                                textTransform: 'uppercase',
+                                textAlign: 'left'
                             }}>
                                 {groups[type]}
                             </td>
                             {sectionTotals.map((total, i) => (
                                 <td key={i} style={{
-                                    padding: '16px 12px',
+                                    padding: isMobile ? '4px 2px' : '16px 12px',
                                     textAlign: 'right',
                                     fontWeight: '900',
-                                    fontSize: '1.2rem',
-                                    color: '#000'
+                                    fontSize: isMobile ? '0.75rem' : '1.2rem',
+                                    color: '#000',
+                                    whiteSpace: 'nowrap'
                                 }}>
                                     {formatCurrency(total).replace('€', '').trim()}
                                 </td>
@@ -254,7 +264,12 @@ const Reports = () => {
 
     const getPeriodLabel = () => {
         if (period === 'ANNUAL') return activeTab === 'balance' ? `31/12/${year}` : year;
-        return activeTab === 'balance' ? `Cierre Trimestral ${year}` : `Trimestres ${year}`;
+        const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+        if (period.startsWith('M')) {
+            const mIdx = parseInt(period.substring(1)) - 1;
+            return activeTab === 'balance' ? `Cierre ${months[mIdx]} ${year}` : `${months[mIdx]} ${year}`;
+        }
+        return activeTab === 'balance' ? `Mensual ${year}` : `Mensual ${year}`;
     };
 
     return (
@@ -266,21 +281,45 @@ const Reports = () => {
                     <div style={{ display: 'flex', background: '#eee', padding: '4px', borderRadius: '10px' }}>
                         {[
                             { id: 'ANNUAL', label: 'Anual' },
-                            { id: 'QUARTERLY', label: 'Trimestral' }
+                            { id: 'MONTHLY', label: 'Mensual' }
                         ].map(p => (
                             <button
                                 key={p.id}
                                 onClick={() => setPeriod(p.id)}
                                 style={{
                                     padding: '8px 24px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold',
-                                    background: period === p.id ? 'white' : 'transparent',
-                                    color: period === p.id ? 'var(--primary)' : '#666',
-                                    boxShadow: period === p.id ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                                    background: period === p.id || (p.id === 'MONTHLY' && period.startsWith('M')) ? 'white' : 'transparent',
+                                    color: period === p.id || (p.id === 'MONTHLY' && period.startsWith('M')) ? 'var(--primary)' : '#666',
+                                    boxShadow: period === p.id || (p.id === 'MONTHLY' && period.startsWith('M')) ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
                                 }}
                             >
                                 {p.label}
                             </button>
                         ))}
+                    </div>
+
+                    {(period === 'MONTHLY' || period.startsWith('M')) && (
+                        <select
+                            value={period === 'MONTHLY' ? `M${String(new Date().getMonth() + 1).padStart(2, '0')}` : period}
+                            onChange={(e) => setPeriod(e.target.value)}
+                            style={{ padding: '8px', borderRadius: '8px', border: '1px solid #ddd', fontWeight: 'bold' }}
+                        >
+                            {["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"].map((m, i) => (
+                                <option key={i} value={`M${String(i + 1).padStart(2, '0')}`}>{m}</option>
+                            ))}
+                        </select>
+                    )}
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'white', padding: '8px 16px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', color: '#666' }}>
+                            <input
+                                type="checkbox"
+                                checked={showComparison}
+                                onChange={(e) => setShowComparison(e.target.checked)}
+                                style={{ width: '16px', height: '16px' }}
+                            />
+                            Ver Comparativa
+                        </label>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: 'white', padding: '8px 16px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
@@ -317,7 +356,7 @@ const Reports = () => {
                 ))}
             </div>
 
-            <div className="card" style={{ padding: '40px' }}>
+            <div className="card" style={{ padding: isMobile ? '16px' : '40px' }}>
                 {loading ? (
                     <div style={{ display: 'flex', justifyContent: 'center', padding: '100px' }}>
                         <Loader2 className="animate-spin" size={48} color="var(--primary)" />
@@ -328,9 +367,9 @@ const Reports = () => {
                             <h1 style={{
                                 margin: 0,
                                 color: '#448aff',
-                                fontSize: '2.5rem',
+                                fontSize: isMobile ? '1.5rem' : '2.5rem',
                                 fontWeight: '900',
-                                letterSpacing: '2px',
+                                letterSpacing: '1px',
                                 textTransform: 'uppercase'
                             }}>
                                 {activeTab === 'balance' ? 'BALANCE DE SITUACIÓN' :

@@ -4,7 +4,7 @@ import api from '../services/api';
 import { PGC_ACCOUNTS } from '../data/pgc';
 import { Plus, ChevronRight, ChevronDown, Trash2, Pencil, Search, ArrowUpDown, Eye } from 'lucide-react';
 
-const AccountItem = ({ account, level, onAddChild, onDelete, onEdit, onViewDetails, expandedIds, toggleExpand }) => {
+const AccountItem = ({ account, level, onAddChild, onDelete, onEdit, onViewDetails, expandedIds, toggleExpand, isMobile }) => {
     const hasChildren = account.children && account.children.length > 0;
     const isExpanded = expandedIds.has(account.id);
 
@@ -21,29 +21,47 @@ const AccountItem = ({ account, level, onAddChild, onDelete, onEdit, onViewDetai
                 >
                     {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </div>
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 600, marginRight: '8px', color: '#555' }}>{account.code}</span>
-                    <span style={{ fontWeight: 500 }}>{account.name}</span>
-                    <span style={{ marginLeft: 'auto', fontWeight: 600, color: '#333' }}>
-                        {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(account.totalBalance || 0)}
-                    </span>
-                    <span className={`badge badge-${account.type.toLowerCase()}`} style={{ marginLeft: '12px', fontSize: '10px' }}>
-                        {account.type}
-                    </span>
-                </div>
-                <div className="actions">
-                    <button className="btn-icon" onClick={() => onViewDetails(account)} title="Ver movimientos">
-                        <Eye size={16} />
-                    </button>
-                    <button className="btn-icon" onClick={() => onEdit(account)}>
-                        <Pencil size={16} />
-                    </button>
-                    <button className="btn-icon" onClick={() => onAddChild(account)}>
-                        <Plus size={16} />
-                    </button>
-                    <button className="btn-icon danger" onClick={() => onDelete(account.id)}>
-                        <Trash2 size={16} />
-                    </button>
+                <div style={{ flex: 1, display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? '2px' : '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', width: isMobile ? '100%' : 'auto' }}>
+                        <span style={{ fontWeight: 600, marginRight: '8px', color: '#555', fontSize: isMobile ? '12px' : 'inherit' }}>{account.code}</span>
+                        <span style={{ fontWeight: 500, fontSize: isMobile ? '13px' : 'inherit' }}>{account.name}</span>
+                    </div>
+
+                    <div style={{
+                        marginLeft: isMobile ? '0' : 'auto',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: isMobile ? 'space-between' : 'flex-end',
+                        width: isMobile ? '100%' : 'auto'
+                    }}>
+                        <span style={{ fontWeight: 600, color: '#333', fontSize: isMobile ? '12px' : 'inherit' }}>
+                            {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(account.totalBalance || 0)}
+                        </span>
+                        <span className={`badge badge-${account.type.toLowerCase()}`} style={{ marginLeft: '12px', fontSize: '9px', padding: '2px 4px' }}>
+                            {account.type}
+                        </span>
+                    </div>
+
+                    <div className="actions" style={{
+                        display: 'flex',
+                        marginLeft: isMobile ? '0' : '8px',
+                        width: isMobile ? '100%' : 'auto',
+                        justifyContent: isMobile ? 'flex-end' : 'flex-start',
+                        marginTop: isMobile ? '2px' : '0'
+                    }}>
+                        <button className="btn-icon" onClick={() => onViewDetails(account)} title="Ver movimientos">
+                            <Eye size={isMobile ? 14 : 16} />
+                        </button>
+                        <button className="btn-icon" onClick={() => onEdit(account)}>
+                            <Pencil size={isMobile ? 14 : 16} />
+                        </button>
+                        <button className="btn-icon" onClick={() => onAddChild(account)}>
+                            <Plus size={isMobile ? 14 : 16} />
+                        </button>
+                        <button className="btn-icon danger" onClick={() => onDelete(account.id)}>
+                            <Trash2 size={isMobile ? 14 : 16} />
+                        </button>
+                    </div>
                 </div>
             </div>
             {hasChildren && isExpanded && (
@@ -59,6 +77,7 @@ const AccountItem = ({ account, level, onAddChild, onDelete, onEdit, onViewDetai
                             onViewDetails={onViewDetails}
                             expandedIds={expandedIds}
                             toggleExpand={toggleExpand}
+                            isMobile={isMobile}
                         />
                     ))}
                 </div>
@@ -417,6 +436,7 @@ const Accounts = () => {
                                             onViewDetails={(acc) => navigate(`/journal?code=${acc.code}`)}
                                             expandedIds={expandedIds}
                                             toggleExpand={toggleExpand}
+                                            isMobile={isMobile}
                                         />
                                     ))}
                                 </div>

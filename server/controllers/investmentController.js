@@ -3,6 +3,14 @@ const YahooFinance = require('yahoo-finance2').default;
 const fs = require('fs');
 const path = require('path');
 
+// Seeded Random Generator for deterministic results
+const seededRandom = (seed) => {
+    return () => {
+        seed = (seed * 9301 + 49297) % 233280;
+        return seed / 233280;
+    };
+};
+
 // --- INVESTMENT METRICS HELPERS ---
 
 const p = (num) => (num * 100).toFixed(2) + "%";
@@ -2466,7 +2474,8 @@ exports.getWalkforwardAnalysis = async (req, res) => {
             benchmark = 'SPY',
             rebalanceMonths = 6,  // Legacy fallback
             rebalanceType = 'months',
-            rebalanceValue
+            rebalanceValue,
+            assetsTrigger = 0    // 0 = whole portfolio, N = N individual assets must exceed target
         } = req.body;
 
         const finalRebalanceValue = rebalanceValue !== undefined ? rebalanceValue : rebalanceMonths;
@@ -2526,8 +2535,11 @@ exports.getWalkforwardAnalysis = async (req, res) => {
             let bestSharpe = -Infinity;
             let bestW = null;
 
+            // Use seeded random for consistency
+            const random = seededRandom(42);
+
             for (let i = 0; i < numSims; i++) {
-                let w = tickers.map(() => Math.random());
+                let w = tickers.map(() => random());
                 const sum = w.reduce((a, b) => a + b, 0);
                 w = w.map(v => v / sum);
 
@@ -2647,9 +2659,26 @@ exports.getWalkforwardAnalysis = async (req, res) => {
                         shouldRebalance = true;
                     }
                 } else if (rebalanceType === 'profit') {
-                    const profitPct = ((dayCap - startCap) / startCap) * 100;
-                    if (Math.abs(profitPct) >= finalRebalanceValue) {
-                        shouldRebalance = true;
+                    if (assetsTrigger === 0) {
+                        // Whole portfolio: rebalance when portfolio gain >= target
+                        const profitPct = ((dayCap - startCap) / startCap) * 100;
+                        if (profitPct >= finalRebalanceValue) {
+                            shouldRebalance = true;
+                        }
+                    } else {
+                        // N assets trigger: rebalance when at least assetsTrigger assets have gained >= target
+                        let assetsThatTriggered = 0;
+                        for (let j = 0; j < tickers.length; j++) {
+                            const assetStartPrice = priceMap[oosStart][tickers[j]];
+                            const assetCurrentPrice = priceMap[d][tickers[j]];
+                            const assetGainPct = ((assetCurrentPrice - assetStartPrice) / assetStartPrice) * 100;
+                            if (assetGainPct >= finalRebalanceValue) {
+                                assetsThatTriggered++;
+                            }
+                        }
+                        if (assetsThatTriggered >= assetsTrigger) {
+                            shouldRebalance = true;
+                        }
                     }
                 } else if (rebalanceType === 'deviation') {
                     for (let j = 0; j < tickers.length; j++) {
@@ -2812,9 +2841,12 @@ exports.getWalkforwardMatrix = async (req, res) => {
                     returns.push(tickers.map(t => (priceMap[t1][t] - priceMap[t0][t]) / priceMap[t0][t]));
                 }
 
+                // Seeded random for consistency
+                const random = seededRandom(123);
+
                 let bestS = -Infinity, bestW = null;
                 for (let i = 0; i < 500; i++) {
-                    let w = tickers.map(() => Math.random());
+                    let w = tickers.map(() => random());
                     const s = w.reduce((a, b) => a + b, 0); w = w.map(v => v / s);
                     const pr = returns.map(r => r.reduce((acc, val, idx) => acc + val * w[idx], 0));
                     const m = pr.reduce((a, b) => a + b, 0) / pr.length;
@@ -2844,14 +2876,14 @@ exports.getWalkforwardMatrix = async (req, res) => {
                     } else if (wfMatrixRebalanceType === 'profit') {
                         if (assetsTrigger === 0) {
                             const profitPct = ((dayCap - startCap) / startCap) * 100;
-                            if (Math.abs(profitPct) >= rebalanceValue) shouldRebalance = true;
+                            if (profitPct >= rebalanceValue) shouldRebalance = true;
                         } else {
                             let assetsHit = 0;
                             for (let j = 0; j < tickers.length; j++) {
                                 const assetStart = shares[j] * priceMap[oosStart][tickers[j]];
                                 const assetNow = shares[j] * priceMap[d][tickers[j]];
                                 const assetPct = ((assetNow - assetStart) / assetStart) * 100;
-                                if (Math.abs(assetPct) >= rebalanceValue) assetsHit++;
+                                if (assetPct >= rebalanceValue) assetsHit++;
                             }
                             if (assetsHit >= assetsTrigger) shouldRebalance = true;
                         }

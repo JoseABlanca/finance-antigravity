@@ -7,7 +7,7 @@ import { TrendingUp, Wallet, ArrowRightLeft, Plus } from 'lucide-react';
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend);
 
 const FinanceDashboard = () => {
-    const [trendType, setTrendType] = useState('ANNUAL'); // 'ANNUAL' or 'QUARTERLY'
+    const [trendType, setTrendType] = useState('MONTHLY'); // 'ANNUAL' or 'MONTHLY'
     const [trends, setTrends] = useState([]);
     const [summary, setSummary] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -216,15 +216,15 @@ const FinanceDashboard = () => {
                     width: isMobile ? 'fit-content' : 'auto'
                 }}>
                     <button
-                        onClick={() => setTrendType('QUARTERLY')}
+                        onClick={() => setTrendType('MONTHLY')}
                         style={{
                             padding: '10px 20px', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', fontSize: '14px',
-                            background: trendType === 'QUARTERLY' ? 'white' : 'transparent',
-                            color: trendType === 'QUARTERLY' ? '#333' : '#64748b',
-                            boxShadow: trendType === 'QUARTERLY' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                            background: trendType === 'MONTHLY' ? 'white' : 'transparent',
+                            color: trendType === 'MONTHLY' ? '#333' : '#64748b',
+                            boxShadow: trendType === 'MONTHLY' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
                         }}
                     >
-                        Trimestral
+                        Mensual
                     </button>
                     <button
                         onClick={() => setTrendType('ANNUAL')}

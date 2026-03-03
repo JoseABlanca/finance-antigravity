@@ -54,7 +54,7 @@ const QuantReport = () => {
     const [optMetric, setOptMetric] = useState('volatility'); // 'volatility' or 'maxDrawdown'
 
     // New Optimizer Tabs State
-    const [optTab, setOptTab] = useState('efficientFrontier'); // 'efficientFrontier', 'correlation', 'walkforward'
+    const [optTab, setOptTab] = useState('efficientFrontier'); // 'efficientFrontier', 'correlation', 'rebalance'
     const [correlationData, setCorrelationData] = useState(null);
     const [correlationLoading, setCorrelationLoading] = useState(false);
     const [correlationPeriod, setCorrelationPeriod] = useState('daily'); // daily, monthly, annual
@@ -63,6 +63,7 @@ const QuantReport = () => {
     const [walkforwardLoading, setWalkforwardLoading] = useState(false);
     const [wfRebalanceType, setWfRebalanceType] = useState('months'); // 'months', 'profit', 'deviation'
     const [wfRebalanceValue, setWfRebalanceValue] = useState(6);
+    const [wfAssetsNTrigger, setWfAssetsNTrigger] = useState(0); // 0 = whole portfolio, n = n assets
     const [wfSource, setWfSource] = useState('optimizer'); // 'optimizer' or 'portfolio'
     const [wfTab, setWfTab] = useState('analysis'); // 'analysis', 'matrix'
     const [wfMatrixData, setWfMatrixData] = useState(null);
@@ -97,7 +98,7 @@ const QuantReport = () => {
         setError(null);
         setSelectedWeights(null);
         setSelectedPortfolioInfo(null);
-        const tickersList = optTickers.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0 && t !== 'WALKFORWARD');
+        const tickersList = optTickers.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0 && t !== 'rebalance');
 
         let optRes = null;
         try {
@@ -150,6 +151,7 @@ const QuantReport = () => {
                     years: years,
                     rebalanceType: wfRebalanceType,
                     rebalanceValue: wfRebalanceValue,
+                    assetsTrigger: wfAssetsNTrigger,
                     initialCapital: 10000,
                     benchmark: benchmark
                 });
@@ -168,13 +170,16 @@ const QuantReport = () => {
         try {
             const tickersList = wfSource === 'portfolio'
                 ? portfolioAssets
-                : optTickers.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0 && t !== 'WALKFORWARD');
+                : optTickers.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0 && t !== 'rebalance');
 
             if (tickersList.length >= 2) {
                 const res = await api.post('/investments/walkforward-matrix', {
                     tickers: tickersList,
                     rebalanceRange: wfMatrixRebalanceRange,
                     metric: wfMatrixMetric,
+                    wfMatrixRebalanceType,
+                    wfMatrixRebalanceRange,
+                    wfMatrixAssetsRange,
                     initialCapital: 10000,
                     benchmark: benchmark
                 });
@@ -194,7 +199,7 @@ const QuantReport = () => {
         try {
             const tickersList = wfSource === 'portfolio'
                 ? portfolioAssets.map(a => a.ticker)
-                : optTickers.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0 && t !== 'WALKFORWARD');
+                : optTickers.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0 && t !== 'rebalance');
 
             const resCor = await api.post('/investments/correlation', {
                 tickers: tickersList,
@@ -1070,7 +1075,7 @@ const QuantReport = () => {
                                     style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #ddd', background: '#f8f9fa', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
                                 >
                                     <option value="PORTFOLIO">Investment Report</option>
-                                    <option value="OPTIMIZER">Portfolio Optimizer</option>
+                                    {!isMobile && <option value="OPTIMIZER">Portfolio Optimizer</option>}
                                     <option value="RISK_ANALYSIS">Risk Analysis Montecarlo</option>
                                 </select>
                             </div>
@@ -1223,7 +1228,7 @@ const QuantReport = () => {
                                     <button onClick={() => setOptTab('correlation')} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: optTab === 'correlation' ? '#1E88E5' : '#e1e1e6', color: optTab === 'correlation' ? 'white' : '#333', cursor: 'pointer', fontWeight: optTab === 'correlation' ? 'bold' : 'normal' }}>
                                         Matriz de Correlación
                                     </button>
-                                    <button onClick={() => setOptTab('walkforward')} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: optTab === 'walkforward' ? '#1E88E5' : '#e1e1e6', color: optTab === 'walkforward' ? 'white' : '#333', cursor: 'pointer', fontWeight: optTab === 'walkforward' ? 'bold' : 'normal' }}>
+                                    <button onClick={() => setOptTab('rebalance')} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: optTab === 'rebalance' ? '#1E88E5' : '#e1e1e6', color: optTab === 'rebalance' ? 'white' : '#333', cursor: 'pointer', fontWeight: optTab === 'rebalance' ? 'bold' : 'normal' }}>
                                         Walkforward Analysis
                                     </button>
                                 </div>
@@ -1495,163 +1500,10 @@ const QuantReport = () => {
                                                         </div>
                                                     );
                                                 })()}
-                                                {/* Expected Value Card */}
-                                                {kde3dData && (
-                                                    <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-                                                        <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold', color: '#8b5cf6' }}>Expected Value (Mean)</h3>
-                                                        <div style={{ marginBottom: '12px', fontSize: '14px' }}>
-                                                            <strong>Ret:</strong> {kde3dData.meanReturn.toFixed(2)}% |
-                                                            <strong> {optMetric === 'volatility' ? 'Vol' : 'Max DD'}:</strong> {kde3dData.meanRisk.toFixed(2)}%
-                                                        </div>
-                                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                                                            <thead>
-                                                                <tr style={{ borderBottom: '1px solid #eee' }}><th style={{ textAlign: 'left', padding: '4px' }}>Ticker</th><th style={{ textAlign: 'right', padding: '4px' }}>Weight</th></tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {Object.entries(kde3dData.avgWeights).sort(([, a], [, b]) => b - a).map(([k, v]) => (
-                                                                    <tr key={k}>
-                                                                        <td style={{ padding: '4px' }}>{k}</td>
-                                                                        <td style={{ padding: '4px', textAlign: 'right' }}>{(v * 100).toFixed(1)}%</td>
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                )}
                                             </div>
                                         </div>
-
-                                        {kde3dData && (
-                                            <div style={{ marginTop: '24px', background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: isMobile ? '500px' : '850px' }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                                                    <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>Distribución de Portafolios (3D KDE)</h3>
-                                                    <div style={{ fontSize: '12px', color: '#666' }}>
-                                                        Eje X: Retorno | Eje Z: {optMetric === 'volatility' ? 'Volatilidad' : 'Max Drawdown'} | Eje Y: Ocurrencias
-                                                    </div>
-                                                </div>
-                                                <div style={{ height: 'calc(100% - 60px)' }}>
-                                                    <Plot
-                                                        data={[
-                                                            {
-                                                                z: kde3dData.z,
-                                                                x: kde3dData.x,
-                                                                y: kde3dData.y,
-                                                                type: 'surface',
-                                                                colorscale: 'Portland',
-                                                                showscale: true,
-                                                                colorbar: { title: 'Densidad', thickness: 15, len: 0.5 },
-                                                                lighting: { ambient: 0.6, diffuse: 0.8, specular: 0.2, roughness: 0.5 },
-                                                                name: 'Distribución KDE',
-                                                                hovertemplate: 'Ret: %{x:.2f}%<br>Risk: %{y:.2f}%<br>Dens: %{z:.4f}<extra></extra>'
-                                                            },
-                                                            {
-                                                                // Expected Value Vertical Line (Pole)
-                                                                x: [kde3dData.meanReturn, kde3dData.meanReturn],
-                                                                y: [kde3dData.meanRisk, kde3dData.meanRisk],
-                                                                z: [0, (() => {
-                                                                    const returns = optData.points.map(p => p.return * 100);
-                                                                    const risks = optData.points.map(p => (optMetric === 'volatility' ? p.volatility : Math.abs(p.maxDrawdown)) * 100);
-                                                                    const n = returns.length;
-                                                                    const stdX = Math.sqrt(returns.reduce((a, b) => a + Math.pow(b - kde3dData.meanReturn, 2), 0) / n) || 1;
-                                                                    const stdY = Math.sqrt(risks.reduce((a, b) => a + Math.pow(b - kde3dData.meanRisk, 2), 0) / n) || 1;
-                                                                    const hX = 1.06 * stdX * Math.pow(n, -0.2);
-                                                                    const hY = 1.06 * stdY * Math.pow(n, -0.2);
-                                                                    let sum = 0;
-                                                                    const g2 = (dx, dy) => (1 / (2 * Math.PI * hX * hY)) * Math.exp(-0.5 * (Math.pow(dx / hX, 2) + Math.pow(dy / hY, 2)));
-                                                                    for (let k = 0; k < n; k++) sum += g2(kde3dData.meanReturn - returns[k], kde3dData.meanRisk - risks[k]);
-                                                                    return (sum / n) * 1.5;
-                                                                })()],
-                                                                mode: 'lines',
-                                                                type: 'scatter3d',
-                                                                line: { color: '#8b5cf6', width: 6 },
-                                                                name: 'Expected Value'
-                                                            },
-                                                            {
-                                                                x: [(optMetric === 'volatility' ? optData.bestPortfolio.return : optData.maxCalmarPortfolio.return) * 100],
-                                                                y: [(optMetric === 'volatility' ? optData.bestPortfolio.volatility : Math.abs(optData.maxCalmarPortfolio.maxDrawdown)) * 100],
-                                                                z: [(() => {
-                                                                    const returns = optData.points.map(p => p.return * 100);
-                                                                    const risks = optData.points.map(p => (optMetric === 'volatility' ? p.volatility : Math.abs(p.maxDrawdown)) * 100);
-                                                                    const n = returns.length;
-                                                                    const meanX = returns.reduce((a, b) => a + b, 0) / n;
-                                                                    const meanY = risks.reduce((a, b) => a + b, 0) / n;
-                                                                    const stdX = Math.sqrt(returns.reduce((a, b) => a + Math.pow(b - meanX, 2), 0) / n) || 1;
-                                                                    const stdY = Math.sqrt(risks.reduce((a, b) => a + Math.pow(b - meanY, 2), 0) / n) || 1;
-                                                                    const hX = 1.06 * stdX * Math.pow(n, -0.2);
-                                                                    const hY = 1.06 * stdY * Math.pow(n, -0.2);
-                                                                    let sum = 0;
-                                                                    const g2 = (dx, dy) => (1 / (2 * Math.PI * hX * hY)) * Math.exp(-0.5 * (Math.pow(dx / hX, 2) + Math.pow(dy / hY, 2)));
-                                                                    const targetP = optMetric === 'volatility' ? optData.bestPortfolio : optData.maxCalmarPortfolio;
-                                                                    const targetX = targetP.return * 100;
-                                                                    const targetY = (optMetric === 'volatility' ? targetP.volatility : Math.abs(targetP.maxDrawdown)) * 100;
-                                                                    for (let k = 0; k < n; k++) sum += g2(targetX - returns[k], targetY - risks[k]);
-                                                                    return (sum / n) * 1.1;
-                                                                })()],
-                                                                mode: 'markers',
-                                                                type: 'scatter3d',
-                                                                marker: { color: '#dc2626', size: 10, symbol: 'diamond', line: { color: 'white', width: 2 } },
-                                                                name: optMetric === 'volatility' ? 'Max Sharpe' : 'Max RT/Avg DD'
-                                                            },
-                                                            (() => {
-                                                                const targetPort = optMetric === 'volatility' ? optData.minVolPortfolio : optData.minDrawdownPortfolio;
-                                                                if (!targetPort) return null;
-                                                                return {
-                                                                    x: [targetPort.return * 100],
-                                                                    y: [(optMetric === 'volatility' ? targetPort.volatility : Math.abs(targetPort.maxDrawdown)) * 100],
-                                                                    z: [(() => {
-                                                                        const returns = optData.points.map(p => p.return * 100);
-                                                                        const risks = optData.points.map(p => (optMetric === 'volatility' ? p.volatility : Math.abs(p.maxDrawdown)) * 100);
-                                                                        const n = returns.length;
-                                                                        const meanX = returns.reduce((a, b) => a + b, 0) / n;
-                                                                        const meanY = risks.reduce((a, b) => a + b, 0) / n;
-                                                                        const stdX = Math.sqrt(returns.reduce((a, b) => a + Math.pow(b - meanX, 2), 0) / n) || 1;
-                                                                        const stdY = Math.sqrt(risks.reduce((a, b) => a + Math.pow(b - meanY, 2), 0) / n) || 1;
-                                                                        const hX = 1.06 * stdX * Math.pow(n, -0.2);
-                                                                        const hY = 1.06 * stdY * Math.pow(n, -0.2);
-                                                                        let sum = 0;
-                                                                        const g2 = (dx, dy) => (1 / (2 * Math.PI * hX * hY)) * Math.exp(-0.5 * (Math.pow(dx / hX, 2) + Math.pow(dy / hY, 2)));
-                                                                        const tX = targetPort.return * 100;
-                                                                        const tY = (optMetric === 'volatility' ? targetPort.volatility : Math.abs(targetPort.maxDrawdown)) * 100;
-                                                                        for (let k = 0; k < n; k++) sum += g2(tX - returns[k], tY - risks[k]);
-                                                                        return (sum / n) * 1.1;
-                                                                    })()],
-                                                                    mode: 'markers',
-                                                                    type: 'scatter3d',
-                                                                    marker: { color: '#fbbf24', size: 10, symbol: 'square', line: { color: 'white', width: 2 } },
-                                                                    name: optMetric === 'volatility' ? 'Min Volatility' : 'Min Avg Drawdown'
-                                                                };
-                                                            })()
-                                                        ].filter(Boolean)}
-                                                        layout={{
-                                                            autosize: true,
-                                                            margin: { l: 0, r: 0, b: 0, t: 40 },
-                                                            paper_bgcolor: 'rgba(0,0,0,0)',
-                                                            plot_bgcolor: 'rgba(0,0,0,0)',
-                                                            scene: {
-                                                                xaxis: { title: 'Retorno %', gridcolor: '#eee' },
-                                                                yaxis: { title: (optMetric === 'volatility' ? 'Volatilidad' : 'Avg Drawdown') + ' %', gridcolor: '#eee' },
-                                                                zaxis: { title: 'Densidad', gridcolor: '#eee' },
-                                                                camera: { eye: { x: 1.8, y: 1.8, z: 1.2 } },
-                                                                backgroundColor: 'white'
-                                                            },
-                                                            legend: { orientation: 'h', y: 1.1 }
-                                                        }}
-                                                        style={{ width: "100%", height: "100%" }}
-                                                        config={{ responsive: true, displayModeBar: true, displaylogo: false }}
-                                                        onHover={(event) => {
-                                                            const p = event.points[0];
-                                                            if (p.fullData.name === 'Expected Value') {
-                                                                setHoveredPoint({ type: 'expected' });
-                                                            }
-                                                        }}
-                                                        onUnhover={() => setHoveredPoint(null)}
-                                                    />
-                                                </div>
-                                            </div>
-                                        )}
                                     </>
                                 )}
-
                                 {optTab === 'correlation' && (
                                     <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '16px' }}>
@@ -1746,7 +1598,7 @@ const QuantReport = () => {
                                                                     size: 3,
                                                                     line: { color: 'white', width: 0.5 }
                                                                 },
-                                                                diagonal: { visible: false },
+                                                                diagonal: { type: 'histogram' },
                                                                 showupperhalf: false
                                                             }]}
                                                             layout={{
@@ -1766,7 +1618,7 @@ const QuantReport = () => {
                                 )}
 
 
-                                {optTab === 'walkforward' && (
+                                {optTab === 'rebalance' && (
                                     <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -1809,7 +1661,7 @@ const QuantReport = () => {
                                                             style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}
                                                         >
                                                             <option value="months">Por Periodo Fijo (Meses)</option>
-                                                            <option value="profit">Por Ganancia de Cartera (%)</option>
+                                                            <option value="profit">Por Ganancia (%)</option>
                                                             <option value="deviation">Por Desajuste de Pesos (%)</option>
                                                         </select>
                                                     </div>
@@ -1817,7 +1669,7 @@ const QuantReport = () => {
                                                         <label style={{ fontSize: '11px', color: '#666', minHeight: '13px' }}>
                                                             {wfRebalanceType === 'months' ? 'Meses de Rebalanceo' :
                                                                 wfRebalanceType === 'profit' ? 'Objetivo de Ganancia (%)' :
-                                                                    'Desvío Tolerado (%)'}
+                                                                    'Desajuste Tolerado (%)'}
                                                         </label>
                                                         <input
                                                             type="number"
@@ -1826,7 +1678,19 @@ const QuantReport = () => {
                                                             style={{ width: '80px', padding: '6px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}
                                                         />
                                                     </div>
-                                                    <button
+                                                    {wfRebalanceType === 'profit' && (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                            <label style={{ fontSize: '11px', color: '#666' }}>N&#xb0; Activos (0=Cartera)</label>
+                                                            <input
+                                                                type="number"
+                                                                min={0}
+                                                                value={wfAssetsNTrigger}
+                                                                onChange={(e) => setWfAssetsNTrigger(parseInt(e.target.value) || 0)}
+                                                                style={{ width: '80px', padding: '6px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}
+                                                                title="0 = rebalancear cuando la cartera sube el % objetivo. N = cuando N activos individuales lo superan"
+                                                            />
+                                                        </div>
+                                                    )}<button
                                                         onClick={fetchWalkforward}
                                                         disabled={walkforwardLoading}
                                                         style={{ padding: '8px 16px', background: '#1e3a8a', color: 'white', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: '500', fontSize: '13px', alignSelf: 'flex-end' }}
@@ -2015,7 +1879,7 @@ const QuantReport = () => {
                                                         >
                                                             <option value="months">Meses</option>
                                                             <option value="profit">Ganancia (%)</option>
-                                                            <option value="deviation">Desvío (%)</option>
+                                                            <option value="deviation">Desajuste de Pesos (%)</option>
                                                         </select>
                                                     </div>
 
@@ -2080,20 +1944,36 @@ const QuantReport = () => {
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                                                         <div style={{ height: '400px', width: '100%' }}>
                                                             <Plot
-                                                                data={[{
+
+                                                                data={wfMatrixRebalanceType === 'months' ? [{
                                                                     x: wfMatrixData.x,
-                                                                    y: wfMatrixData.y,
-                                                                    z: wfMatrixData.z,
-                                                                    type: 'heatmap',
-                                                                    colorscale: 'Viridis',
-                                                                    hoverongaps: false
-                                                                }]}
+                                                                    y: wfMatrixData.z && wfMatrixData.z[0] ? wfMatrixData.z[0] : [],
+                                                                    type: 'scatter',
+                                                                    mode: 'lines+markers',
+                                                                    marker: { size: 8, color: '#10b981' },
+                                                                    line: { color: '#10b981', width: 2 },
+                                                                    name: wfMatrixMetric
+                                                                }] : (wfMatrixData.y || []).map((assetVal, yi) => ({
+                                                                    x: wfMatrixData.x || [],
+                                                                    y: Array(wfMatrixData.x.length).fill(assetVal),
+                                                                    z: (wfMatrixData.z && wfMatrixData.z[yi]) || [],
+                                                                    type: 'scatter3d',
+                                                                    mode: 'markers',
+                                                                    marker: { size: 6, color: (wfMatrixData.z && wfMatrixData.z[yi]) || [], colorscale: 'Viridis', showscale: yi === 0 },
+                                                                    name: assetVal + ' activos'
+                                                                }))}
                                                                 layout={{
-                                                                    title: 'Optimización de Rebalanceo 2D',
+
+                                                                    title: wfMatrixRebalanceType === 'months' ? 'Optimizacion por Meses' : 'Optimizacion 3D: Target vs Activos',
                                                                     autosize: true,
-                                                                    margin: { l: 50, r: 20, b: 50, t: 40 },
-                                                                    xaxis: { title: wfMatrixRebalanceType === 'months' ? 'Meses de Rebalanceo' : 'Valor Objetivo (%)' },
-                                                                    yaxis: { title: 'Num de Activos Triggers' }
+                                                                    margin: wfMatrixRebalanceType === 'months' ? { l: 50, r: 20, b: 50, t: 40 } : { l: 0, r: 0, b: 0, t: 40 },
+                                                                    xaxis: wfMatrixRebalanceType === 'months' ? { title: 'Meses de Rebalanceo' } : undefined,
+                                                                    yaxis: wfMatrixRebalanceType === 'months' ? { title: wfMatrixMetric } : undefined,
+                                                                    scene: wfMatrixRebalanceType !== 'months' ? {
+                                                                        xaxis: { title: wfMatrixRebalanceType === 'profit' ? 'Ganancia (%)' : 'Desajuste (%)' },
+                                                                        yaxis: { title: 'Num Activos' },
+                                                                        zaxis: { title: wfMatrixMetric }
+                                                                    } : undefined
                                                                 }}
                                                                 style={{ width: "100%", height: "100%" }}
                                                                 config={{ responsive: true, displaylogo: false }}
@@ -2117,6 +1997,7 @@ const QuantReport = () => {
                                                                         {[...wfMatrixData.results].sort((a, b) => b[wfMatrixMetric] - a[wfMatrixMetric]).map((r, idx) => (
                                                                             <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx === 0 ? '#f0fdf4' : 'transparent' }}>
                                                                                 <td style={{ padding: '12px', textAlign: 'center', fontWeight: '500', color: '#1e3a8a' }}>{r.rebalance}</td>
+                                                                                <td style={{ padding: '12px', textAlign: 'center' }}>{r.assets}</td>
                                                                                 <td style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: r.return >= 0 ? '#10b981' : '#ef4444' }}>{r.return.toFixed(2)}%</td>
                                                                                 <td style={{ padding: '12px', textAlign: 'right', color: '#ef4444' }}>{r.maxDD.toFixed(2)}%</td>
                                                                                 <td style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold' }}>{r.sharpe.toFixed(2)}</td>

@@ -78,13 +78,15 @@ exports.updateTransaction = (req, res) => {
     }
 
     const updateTx = db.transaction(() => {
-        // 1. Update Transaction Details
-        const stmtTx = db.prepare('UPDATE transactions SET date = ?, description = ?, reference = ? WHERE id = ?');
-        const info = stmtTx.run(date, description, reference, id);
+        // 1. Check if Transaction Exists
+        const txExists = db.prepare('SELECT 1 FROM transactions WHERE id = ?').get(id);
+        if (!txExists) throw new Error('Transaction not found');
 
-        if (info.changes === 0) throw new Error('Transaction not found');
+        // 2. Update Transaction Details
+        db.prepare('UPDATE transactions SET date = ?, description = ?, reference = ? WHERE id = ?')
+            .run(date, description, reference, id);
 
-        // 2. Delete Existing Journal Entries
+        // 3. Delete Existing Journal Entries
         const deleteEntries = db.prepare('DELETE FROM journal_entries WHERE transaction_id = ?');
         deleteEntries.run(id);
 

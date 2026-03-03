@@ -23,7 +23,7 @@ const SearchableSelect = ({ options, value, onChange, placeholder = "Select..." 
         option.label.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const selectedOption = options.find(o => o.value === value);
+    const selectedOption = options.find(o => String(o.value) === String(value));
 
     const handleSelect = (option) => {
         onChange(option.value);
@@ -116,11 +116,11 @@ const SearchableSelect = ({ options, value, onChange, placeholder = "Select..." 
                                         cursor: 'pointer',
                                         fontSize: '13px',
                                         borderBottom: '1px solid #f9f9f9',
-                                        background: option.value === value ? '#f0f9ff' : 'white',
-                                        color: option.value === value ? '#0066cc' : '#333'
+                                        background: String(option.value) === String(value) ? '#f0f9ff' : 'white',
+                                        color: String(option.value) === String(value) ? '#0066cc' : '#333'
                                     }}
                                     onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
-                                    onMouseLeave={(e) => e.currentTarget.style.background = option.value === value ? '#f0f9ff' : 'white'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = String(option.value) === String(value) ? '#f0f9ff' : 'white'}
                                 >
                                     {option.label}
                                 </div>
