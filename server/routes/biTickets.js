@@ -107,16 +107,15 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
         // 3. Call Gemini API
         const prompt = "Analyze this receipt image. Extract the date, supermarket name, total amount, and a detailed list of all purchased items including their prices and quantities. Return the data adhering strictly to the JSON schema requested.";
         
-        const response = await ai.models.generateContent({
-            model: 'gemini-1.5-flash',
+        const response = await ai.getGenerativeModel({ model: 'gemini-1.5-flash' }).generateContent({
             contents: [prompt, imagePart],
-            config: {
+            generationConfig: {
                 responseMimeType: "application/json",
                 responseSchema: responseSchema,
             }
         });
 
-        const extractedData = JSON.parse(response.text);
+        const extractedData = JSON.parse(response.response.text());
         
         // 4. Save to Database
         const imageUrl = `/uploads/${path.basename(filePath)}`;
