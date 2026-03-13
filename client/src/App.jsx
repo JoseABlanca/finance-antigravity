@@ -10,6 +10,8 @@ import Journal from './pages/Journal';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
+import TicketsPage from './pages/TicketsPage';
+import Settings from './pages/Settings';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -30,7 +32,8 @@ function App() {
               <Route path="/investments" element={<ProtectedRoute><Investments /></ProtectedRoute>} />
               <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
               <Route path="/report-quant" element={<ProtectedRoute><QuantReport /></ProtectedRoute>} />
-              <Route path="/settings" element={<ProtectedRoute><div>Settings Page</div></ProtectedRoute>} />
+              <Route path="/tickets" element={<ProtectedRoute><TicketsPage /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             </Routes>
           </main>
         </div>

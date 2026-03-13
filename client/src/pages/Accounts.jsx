@@ -85,6 +85,68 @@ const AccountItem = ({ account, level, onAddChild, onDelete, onEdit, onViewDetai
     );
 };
 
+const PgcItem = ({ account, level, expandedIds, onToggle, isMobile }) => {
+    const hasChildren = account.children && account.children.length > 0;
+    const isExpanded = expandedIds.has(account.code);
+    const isGroup = account.code.length === 1;
+
+    return (
+        <div className="pgc-item">
+            <div
+                className={`pgc-row ${isGroup ? 'pgc-group-header' : ''}`}
+                style={{
+                    paddingLeft: `${level * (isMobile ? 8 : 24) + 12}px`,
+                    backgroundColor: isGroup ? '#f5f5f5' : 'transparent',
+                    borderBottom: '1px solid #eee',
+                    display: 'flex',
+                    alignItems: 'center',
+                    minHeight: isGroup ? '40px' : '32px',
+                    cursor: hasChildren ? 'pointer' : 'default'
+                }}
+                onClick={() => hasChildren && onToggle(account.code)}
+            >
+                <div style={{ width: '20px', display: 'flex', alignItems: 'center' }}>
+                    {hasChildren && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
+                </div>
+                <span style={{
+                    fontWeight: isGroup ? '700' : '600',
+                    width: isMobile ? '40px' : '80px',
+                    color: '#555',
+                    fontSize: isMobile ? '11px' : '13px'
+                }}>
+                    {account.code}
+                </span>
+                <span style={{
+                    fontWeight: isGroup ? '700' : '400',
+                    fontSize: isMobile ? '11px' : '13px',
+                    flex: 1
+                }}>
+                    {account.name}
+                </span>
+                {!isMobile && (
+                    <span className={`badge badge-${account.type.toLowerCase()}`} style={{ fontSize: '9px', padding: '1px 4px' }}>
+                        {account.type}
+                    </span>
+                )}
+            </div>
+            {hasChildren && isExpanded && (
+                <div className="pgc-children">
+                    {account.children.map(child => (
+                        <PgcItem
+                            key={child.code}
+                            account={child}
+                            level={level + 1}
+                            expandedIds={expandedIds}
+                            onToggle={onToggle}
+                            isMobile={isMobile}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const evaluateMathExpression = (expression) => {
     if (!expression) return '';
     try {
@@ -103,11 +165,20 @@ const evaluateMathExpression = (expression) => {
     }
 };
 
+const formatPgcName = (name) => {
+    if (!name) return '';
+    // Format to Sentence Case: First letter upper, rest lower
+    // We keep numbers and dots as they are (e.g., GRUPO 1 -> Grupo 1)
+    const lower = name.toLowerCase();
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+};
+
 const Accounts = () => {
     const navigate = useNavigate();
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const [activeTab, setActiveTab] = useState('mine'); // 'mine' | 'pgc'
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -117,14 +188,37 @@ const Accounts = () => {
     const [showForm, setShowForm] = useState(false);
     const [newAccount, setNewAccount] = useState({ name: '', code: '', type: 'ASSET', parent_id: null, initialBalance: '', balance: '' });
 
-    // Filter PGC accounts based on selected type
-    const pgcSuggestions = PGC_ACCOUNTS.filter(p => p.type === newAccount.type);
+    // Intelligent suggestions based on hierarchical code
+    const intelligentPgcSuggestions = useMemo(() => {
+        const currentCode = (newAccount.code || '').toString().trim();
+
+        // If code is empty, show ONLY groups (1-digit) matching the selected type
+        if (!currentCode) {
+            return PGC_ACCOUNTS.filter(p => p.code.length === 1 && p.type === newAccount.type);
+        }
+
+        const targetLength = currentCode.length + (currentCode.length >= 3 ? 1 : 1);
+        // In PGC: groups are 1, subgroups 2, accounts 3, subaccounts 4+
+        const results = PGC_ACCOUNTS.filter(p => p.code.startsWith(currentCode) && p.code.length > currentCode.length);
+
+        // Prioritize the immediate next level
+        const nextLevel = results.filter(p => p.code.length === (currentCode.length === 1 ? 2 : (currentCode.length === 2 ? 3 : currentCode.length + 1)));
+        return nextLevel.length > 0 ? nextLevel : results;
+    }, [newAccount.code, newAccount.type]);
 
     const onPgcSelect = (e) => {
         const val = e.target.value;
-        const selected = pgcSuggestions.find(p => p.name === val || p.code === val);
+        // Check if val matches "code - name" or just name/code
+        // We check against raw and formatted names for maximum compatibility
+        const selected = PGC_ACCOUNTS.find(p =>
+            p.name === val ||
+            p.code === val ||
+            `${p.code} - ${p.name}` === val ||
+            formatPgcName(p.name) === val ||
+            `${p.code} - ${formatPgcName(p.name)}` === val
+        );
         if (selected) {
-            setNewAccount({ ...newAccount, name: selected.name, code: selected.code });
+            setNewAccount({ ...newAccount, name: formatPgcName(selected.name), code: selected.code, type: selected.type || newAccount.type });
         } else {
             setNewAccount({ ...newAccount, name: val });
         }
@@ -215,7 +309,7 @@ const Accounts = () => {
     const openAddModal = (parent = null) => {
         setNewAccount({
             name: '',
-            code: parent ? `${parent.code}.` : '',
+            code: parent ? parent.code : '', // Removed the dot as requested
             type: parent ? parent.type : 'ASSET',
             parent_id: parent ? parent.id : null,
             initialBalance: ''
@@ -224,9 +318,6 @@ const Accounts = () => {
     };
 
     const openEditModal = (account) => {
-        // When editing, we want to show the current own "balance" as the input value
-        // We reuse 'initialBalance' field or add a new 'balance' field to the form
-        // Let's use 'balance' for update
         setNewAccount({ ...account, balance: account.balance });
         setShowForm(true);
     };
@@ -305,6 +396,55 @@ const Accounts = () => {
         }
     }, [accounts]);
 
+    // PGC Tree logic
+    const pgcTree = useMemo(() => {
+        const buildPgcTree = (list) => {
+            const map = {};
+            const roots = [];
+
+            list.forEach(item => {
+                map[item.code] = { ...item, children: [] };
+            });
+
+            list.forEach(item => {
+                const code = item.code;
+                if (code.length > 1) {
+                    // Find parent: for '100', parent is '10'. For '10', parent is '1'.
+                    let parentCode;
+                    if (code.length === 4) parentCode = code.slice(0, 3);
+                    else if (code.length === 3) parentCode = code.slice(0, 2);
+                    else if (code.length === 2) parentCode = code.slice(0, 1);
+
+                    if (parentCode && map[parentCode]) {
+                        map[parentCode].children.push(map[code]);
+                    } else {
+                        // If no direct parent found in hierarchical slicing, it's a root or orphan
+                        if (code.length === 1) roots.push(map[code]);
+                    }
+                } else {
+                    roots.push(map[code]);
+                }
+            });
+            return roots;
+        };
+        return buildPgcTree(PGC_ACCOUNTS);
+    }, []);
+
+    const [expandedPgcIds, setExpandedPgcIds] = useState(new Set());
+    const toggleExpandPgc = (code) => {
+        const newSet = new Set(expandedPgcIds);
+        if (newSet.has(code)) newSet.delete(code);
+        else newSet.add(code);
+        setExpandedPgcIds(newSet);
+    };
+
+    // Initial expansion for PGC roots
+    useEffect(() => {
+        if (pgcTree.length > 0 && expandedPgcIds.size === 0) {
+            setExpandedPgcIds(new Set(pgcTree.map(g => g.code)));
+        }
+    }, [pgcTree]);
+
     // Auto-expand whenever search term changes and isn't empty
     useEffect(() => {
         if (searchTerm) {
@@ -320,7 +460,7 @@ const Accounts = () => {
                 flexDirection: isMobile ? 'column' : 'row',
                 justifyContent: isMobile ? 'center' : 'space-between',
                 alignItems: 'center',
-                marginBottom: '24px',
+                marginBottom: '16px',
                 gap: isMobile ? '16px' : '0',
                 textAlign: isMobile ? 'center' : 'left'
             }}>
@@ -332,11 +472,53 @@ const Accounts = () => {
                     width: isMobile ? '100%' : 'auto'
                 }}>
                     <h1 style={{ margin: 0, fontSize: isMobile ? '1.8rem' : '2rem' }}>Plan de Cuentas</h1>
+                </div>
+                <button className="btn" onClick={() => openAddModal(null)} style={{ width: isMobile ? '100%' : 'auto' }}>+ Nueva Cuenta Raíz</button>
+            </div>
+
+            <div className="tab-navigation" style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '1px solid #eee', paddingBottom: '0' }}>
+                <button
+                    className={`tab-btn ${activeTab === 'mine' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('mine')}
+                    style={{
+                        padding: '12px 24px',
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: activeTab === 'mine' ? '3px solid var(--primary)' : '3px solid transparent',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        color: activeTab === 'mine' ? 'var(--primary)' : '#666',
+                        fontSize: '14px'
+                    }}
+                >
+                    Mis Cuentas
+                </button>
+                <button
+                    className={`tab-btn ${activeTab === 'pgc' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('pgc')}
+                    style={{
+                        padding: '12px 24px',
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: activeTab === 'pgc' ? '3px solid var(--primary)' : '3px solid transparent',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        color: activeTab === 'pgc' ? 'var(--primary)' : '#666',
+                        fontSize: '14px'
+                    }}
+                >
+                    Cuadro de Cuentas (PGC)
+                </button>
+            </div>
+
+            {activeTab === 'mine' ? (
+                <>
                     <div style={{
                         display: 'flex',
                         flexWrap: 'wrap',
                         justifyContent: isMobile ? 'center' : 'flex-start',
                         gap: '8px',
+                        marginBottom: '16px',
                         width: isMobile ? '100%' : 'auto'
                     }}>
                         <div style={{ display: 'flex', gap: '8px', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'center' : 'flex-start' }}>
@@ -379,72 +561,137 @@ const Accounts = () => {
                             <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '12px', flex: isMobile ? 1 : 'none' }} onClick={collapseAll}>Contraer Todo</button>
                         </div>
                     </div>
-                </div>
-                <button className="btn" onClick={() => openAddModal(null)} style={{ width: isMobile ? '100%' : 'auto' }}>+ Nueva Cuenta Raíz</button>
-            </div>
 
-            <div className="card">
-                {loading ? <p>Cargando...</p> : (
-                    <div className="account-tree">
-                        {['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'].map(type => {
-                            const typeAccounts = processedAccounts.filter(acc => acc.type === type);
-                            if (typeAccounts.length === 0) return null;
+                    <div className="card">
+                        {loading ? <p>Cargando...</p> : (
+                            <div className="account-tree">
+                                {['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'].map(type => {
+                                    const typeAccounts = processedAccounts.filter(acc => acc.type === type);
+                                    if (typeAccounts.length === 0) return null;
 
-                            const groupLabels = {
-                                'ASSET': 'Activo',
-                                'LIABILITY': 'Pasivo',
-                                'EQUITY': 'Patrimonio',
-                                'REVENUE': 'Ingresos',
-                                'EXPENSE': 'Gastos'
-                            };
+                                    const groupLabels = {
+                                        'ASSET': 'Activo',
+                                        'LIABILITY': 'Pasivo',
+                                        'EQUITY': 'Patrimonio',
+                                        'REVENUE': 'Ingresos',
+                                        'EXPENSE': 'Gastos'
+                                    };
 
-                            const groupColors = {
-                                'ASSET': '#00695c',
-                                'LIABILITY': '#c62828',
-                                'EQUITY': '#1565c0',
-                                'REVENUE': '#6a1b9a',
-                                'EXPENSE': '#ef6c00'
-                            };
+                                    const groupColors = {
+                                        'ASSET': '#00695c',
+                                        'LIABILITY': '#c62828',
+                                        'EQUITY': '#1565c0',
+                                        'REVENUE': '#6a1b9a',
+                                        'EXPENSE': '#ef6c00'
+                                    };
 
-                            return (
-                                <div key={type} style={{ marginBottom: '32px' }}>
-                                    <h3 style={{
-                                        borderBottom: `2px solid ${groupColors[type]}`,
-                                        paddingBottom: '8px',
-                                        color: groupColors[type],
-                                        marginBottom: '16px',
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center'
-                                    }}>
-                                        {groupLabels[type]}
-                                        <span style={{ fontSize: '0.8em', color: '#666', fontWeight: 'normal' }}>
-                                            {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(
-                                                typeAccounts.reduce((sum, acc) => sum + (acc.totalBalance || 0), 0)
-                                            )}
-                                        </span>
-                                    </h3>
-                                    {typeAccounts.map(acc => (
-                                        <AccountItem
-                                            key={acc.id}
-                                            account={acc}
-                                            level={0}
-                                            onAddChild={openAddModal}
-                                            onDelete={handleDelete}
-                                            onEdit={openEditModal}
-                                            onViewDetails={(acc) => navigate(`/journal?code=${acc.code}`)}
-                                            expandedIds={expandedIds}
-                                            toggleExpand={toggleExpand}
-                                            isMobile={isMobile}
-                                        />
-                                    ))}
-                                </div>
-                            );
-                        })}
-                        {processedAccounts.length === 0 && <p style={{ textAlign: 'center', color: '#888' }}>No hay cuentas que coincidan con la búsqueda.</p>}
+                                    return (
+                                        <div key={type} style={{ marginBottom: '32px' }}>
+                                            <h3 style={{
+                                                borderBottom: `2px solid ${groupColors[type]}`,
+                                                paddingBottom: '8px',
+                                                color: groupColors[type],
+                                                marginBottom: '16px',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center'
+                                            }}>
+                                                {groupLabels[type]}
+                                                <span style={{ fontSize: '0.8em', color: '#666', fontWeight: 'normal' }}>
+                                                    {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(
+                                                        typeAccounts.reduce((sum, acc) => sum + (acc.totalBalance || 0), 0)
+                                                    )}
+                                                </span>
+                                            </h3>
+                                            {typeAccounts.map(acc => (
+                                                <AccountItem
+                                                    key={acc.id}
+                                                    account={acc}
+                                                    level={0}
+                                                    onAddChild={openAddModal}
+                                                    onDelete={handleDelete}
+                                                    onEdit={openEditModal}
+                                                    onViewDetails={(acc) => navigate(`/journal?code=${acc.code}`)}
+                                                    expandedIds={expandedIds}
+                                                    toggleExpand={toggleExpand}
+                                                    isMobile={isMobile}
+                                                />
+                                            ))}
+                                        </div>
+                                    );
+                                })}
+                                {processedAccounts.length === 0 && <p style={{ textAlign: 'center', color: '#888' }}>No hay cuentas que coincidan con la búsqueda.</p>}
+                            </div>
+                        )}
                     </div>
-                )}
-            </div>
+                </>
+            ) : (
+                <div className="card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <h3>Cuadro de Cuentas (PGC)</h3>
+                        <div style={{ position: 'relative' }}>
+                            <Search size={16} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
+                            <input
+                                type="text"
+                                placeholder="Filtrar PGC..."
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                style={{
+                                    padding: '6px 8px 6px 30px',
+                                    borderRadius: '4px',
+                                    border: '1px solid #ddd',
+                                    fontSize: '13px',
+                                    width: '200px'
+                                }}
+                            />
+                        </div>
+                    </div>
+                    <div style={{ maxHeight: '700px', overflowY: 'auto', border: '1px solid #eee', borderRadius: '4px', background: '#fff' }}>
+                        <div className="pgc-header" style={{
+                            display: 'flex',
+                            padding: '12px',
+                            background: '#f8f9fa',
+                            fontWeight: '700',
+                            borderBottom: '2px solid #ddd',
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: 10
+                        }}>
+                            <div style={{ width: '20px' }}></div>
+                            <div style={{ width: isMobile ? '40px' : '80px' }}>Código</div>
+                            <div style={{ flex: 1 }}>Nombre</div>
+                            {!isMobile && <div style={{ width: '80px' }}>Tipo</div>}
+                        </div>
+                        <div className="pgc-tree-body">
+                            {(() => {
+                                const filterTree = (nodes) => {
+                                    return nodes.reduce((acc, node) => {
+                                        const matches = node.code.includes(searchTerm) || node.name.toLowerCase().includes(searchTerm.toLowerCase());
+                                        const filteredChildren = node.children ? filterTree(node.children) : [];
+
+                                        if (matches || filteredChildren.length > 0) {
+                                            acc.push({ ...node, children: filteredChildren });
+                                        }
+                                        return acc;
+                                    }, []);
+                                };
+                                const filteredPgc = searchTerm ? filterTree(pgcTree) : pgcTree;
+
+                                return filteredPgc.map(group => (
+                                    <PgcItem
+                                        key={group.code}
+                                        account={group}
+                                        level={0}
+                                        expandedIds={searchTerm ? new Set(PGC_ACCOUNTS.map(p => p.code)) : expandedPgcIds}
+                                        onToggle={toggleExpandPgc}
+                                        isMobile={isMobile}
+                                    />
+                                ));
+                            })()}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {showForm && (
                 <div className="modal-overlay">
@@ -458,6 +705,7 @@ const Accounts = () => {
                                         value={newAccount.code}
                                         onChange={e => setNewAccount({ ...newAccount, code: e.target.value })}
                                         placeholder="ej. 572"
+                                        autoComplete="off"
                                     />
                                 </div>
                                 <div className="input-group">
@@ -478,18 +726,26 @@ const Accounts = () => {
                             <div className="input-group">
                                 <label>Nombre</label>
                                 <input
-                                    list="pgc-suggestions"
+                                    list="pgc-intelligent-suggestions"
                                     value={newAccount.name}
                                     onChange={onPgcSelect}
                                     placeholder="ej. Bancos (Escribe para buscar)"
                                     required
                                     autoComplete="off"
                                 />
-                                <datalist id="pgc-suggestions">
-                                    {pgcSuggestions.map((acc, idx) => (
-                                        <option key={idx} value={acc.name}>{acc.code} - {acc.name}</option>
-                                    ))}
+                                <datalist id="pgc-intelligent-suggestions">
+                                    {intelligentPgcSuggestions.map((acc, idx) => {
+                                        const formattedName = formatPgcName(acc.name);
+                                        return (
+                                            <option key={idx} value={`${acc.code} - ${formattedName}`}>
+                                                [{acc.code}] {formattedName}
+                                            </option>
+                                        );
+                                    })}
                                 </datalist>
+                                <p style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>
+                                    {newAccount.code ? `Sugerencias para el grupo ${newAccount.code[0]}...` : 'Sugerencias basadas en el código introducido.'}
+                                </p>
                             </div>
                             <div className="input-group">
                                 <label>{newAccount.id ? 'Saldo Actual (Ajustar)' : 'Saldo Inicial (Opcional)'}</label>
@@ -516,25 +772,14 @@ const Accounts = () => {
                                     }}
                                     onKeyDown={e => {
                                         if (e.key === 'Enter') {
-                                            e.preventDefault(); // Prevent submit to allow seeing the result first, or just calc.
-                                            // Ideally we want to calc then maybe submit? 
-                                            // Users often hit enter to submit. 
-                                            // Let's first calculate. If it was a calc, they might want to see result.
-                                            // If it was already a number, they might want to submit.
-                                            // Simple UX: Enter calculates. Second Enter submits (if valid).
+                                            e.preventDefault();
                                             const val = e.target.value;
                                             const calculated = evaluateMathExpression(val);
-
-                                            // Create updates
                                             if (newAccount.id) {
                                                 setNewAccount({ ...newAccount, balance: calculated });
                                             } else {
                                                 setNewAccount({ ...newAccount, initialBalance: calculated });
                                             }
-
-                                            // If value didn't change (was already pure number) or calc didn't work, 
-                                            // maybe we could let it submit? But preventDefault stops it.
-                                            // Let's just calculate on Enter for now to be safe.
                                         }
                                     }}
                                     placeholder="0.00 o fórmula (ej. 100+20)"
@@ -592,6 +837,20 @@ const Accounts = () => {
                     display: grid;
                     grid-template-columns: 1fr 1fr;
                     gap: 16px;
+                }
+                .pgc-row-hover:hover {
+                    background-color: #f0f7ff;
+                }
+                .tab-btn:hover {
+                    background-color: #f8f9fa !important;
+                }
+                .pgc-group-header {
+                    color: #2c3e50;
+                    font-size: 1.1em;
+                    border-left: 4px solid var(--primary);
+                }
+                .pgc-row:hover {
+                    background-color: #f0f7ff !important;
                 }
             `}</style>
         </div>

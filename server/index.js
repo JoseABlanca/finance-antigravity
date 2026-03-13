@@ -3,10 +3,18 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
+const cron = require('node-cron');
 const db = require('./db');
+const { processUnreadEmails } = require('./services/emailReader');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Schedule the AI Email Reader to run every hour at minute 0
+cron.schedule('0 * * * *', () => {
+    console.log(`[CronJob] Ejecutando lectura programada de correos: ${new Date().toISOString()}`);
+    processUnreadEmails();
+});
 
 app.use(cors({
     origin: '*', // Allows access from any origin (e.g., Firebase Hosting and Localhost)
@@ -18,10 +26,17 @@ app.use(express.json());
 const accountRoutes = require('./routes/accountRoutes');
 const financeRoutes = require('./routes/financeRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const biTicketsRoutes = require('./routes/biTickets');
+const settingsRoutes = require('./routes/settingsRoutes');
+
+// Serve static files from the uploads directory for receipt images
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api/accounts', accountRoutes);
 app.use('/api', financeRoutes); // Mount at root /api to let it handle /transactions and /investments
 app.use('/api/reports', reportRoutes);
+app.use('/api/bi/tickets', biTicketsRoutes);
+app.use('/api/settings', settingsRoutes);
 
 
 // API Routes Placeholder

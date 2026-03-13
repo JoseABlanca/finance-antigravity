@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Wallet, TrendingUp, Settings, ChevronLeft, Menu, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, Wallet, TrendingUp, Settings, ChevronLeft, Menu, LogOut, X, Receipt } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Sidebar = () => {
@@ -107,6 +107,11 @@ const Sidebar = () => {
                     <NavLink to="/report-quant" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Reporte Quant">
                         <TrendingUp size={20} />
                         {(isOpen || isMobileOpen) && <span>Reporte Quant</span>}
+                    </NavLink>
+
+                    <NavLink to="/tickets" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Tickets BI">
+                        <Receipt size={20} />
+                        {(isOpen || isMobileOpen) && <span>Tickets BI</span>}
                     </NavLink>
                     <div style={{ marginTop: 'auto' }}>
                         <NavLink to="/settings" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Configuración">

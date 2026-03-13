@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../services/api';
-import { Search, Download, Menu, X } from 'lucide-react';
+import { Search, Download, Menu, X, PieChart } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, LogarithmicScale, Filler, LineController, BarController, ScatterController } from 'chart.js';
@@ -72,6 +72,8 @@ const QuantReport = () => {
     const [wfMatrixRebalanceRange, setWfMatrixRebalanceRange] = useState({ from: 1, to: 12, step: 1 });
     const [wfMatrixAssetsRange, setWfMatrixAssetsRange] = useState({ from: 0, to: 2, step: 1 });
     const [wfMatrixMetric, setWfMatrixMetric] = useState('sharpe');
+    const [seabornImage, setSeabornImage] = useState(null);
+    const [seabornLoading, setSeabornLoading] = useState(false);
 
     // Monte Carlo State
     const [mcSimulations, setMcSimulations] = useState(100);
@@ -175,7 +177,6 @@ const QuantReport = () => {
             if (tickersList.length >= 2) {
                 const res = await api.post('/investments/walkforward-matrix', {
                     tickers: tickersList,
-                    rebalanceRange: wfMatrixRebalanceRange,
                     metric: wfMatrixMetric,
                     wfMatrixRebalanceType,
                     wfMatrixRebalanceRange,
@@ -198,7 +199,7 @@ const QuantReport = () => {
         setCorrelationLoading(true);
         try {
             const tickersList = wfSource === 'portfolio'
-                ? portfolioAssets.map(a => a.ticker)
+                ? portfolioAssets
                 : optTickers.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0 && t !== 'rebalance');
 
             const resCor = await api.post('/investments/correlation', {
@@ -210,6 +211,16 @@ const QuantReport = () => {
                 type: correlationType
             });
             setCorrelationData(resCor.data);
+
+            // Auto-fetch Seaborn Pairplot if data is available
+            if (resCor.data.rawReturns) {
+                setSeabornLoading(true);
+                api.post('/investments/pairplot-seaborn', { returns: resCor.data.rawReturns })
+                    .then(resSea => setSeabornImage(resSea.data.image))
+                    .catch(err => console.error("Seaborn fetch error:", err))
+                    .finally(() => setSeabornLoading(false));
+            }
+
         } catch (err) {
             console.error("Correlation error:", err);
         } finally {
@@ -606,42 +617,23 @@ const QuantReport = () => {
             const res = await api.get(`/investments/analyze/${targetTicker}${queryParams}`);
             console.log("Analyze response for", targetTicker, res.data);
 
-            if (res.data.error) {
-                // Portfolio has no data → fallback to benchmark
-                if (effectiveMode === 'PORTFOLIO') {
-                    setUsingBenchmarkFallback(true);
-                    const benchRes = await api.get(`/investments/analyze/${targetBench}?benchmark=${targetBench}&currency=${currency}&benchmarkCurrency=${benchmarkCurrency}&years=${period || years}`);
-                    if (!benchRes.data.error) {
-                        setData(benchRes.data);
-                    } else {
-                        setError(benchRes.data.error);
-                        setData(null);
-                    }
-                } else {
-                    setError(res.data.error);
-                    setData(null);
-                }
+            if (res.data.error && effectiveMode === 'PORTFOLIO' && !symbol) {
+                // Re-enable fallback as per user's refined request
+                setUsingBenchmarkFallback(true);
+                const fallbackRes = await api.get(`/investments/analyze/${targetBench}${queryParams}`);
+                setData(fallbackRes.data);
+            } else if (res.data.error) {
+                setError(res.data.error);
+                setData(null);
             } else {
                 setData(res.data);
             }
         } catch (err) {
-            // Portfolio endpoint may throw 400/404 when empty → try benchmark fallback
+            // Portfolio endpoint may throw 400/404 when empty
             if (mode === 'PORTFOLIO' && !symbol) {
-                try {
-                    setUsingBenchmarkFallback(true);
-                    const bmark = bench || benchmark;
-                    const bYears = period || years;
-                    const benchRes = await api.get(`/investments/analyze/${bmark}?benchmark=${bmark}&currency=${currency}&benchmarkCurrency=${benchmarkCurrency}&years=${bYears}`);
-                    if (!benchRes.data.error) {
-                        setData(benchRes.data);
-                    } else {
-                        setError(benchRes.data.error);
-                        setData(null);
-                    }
-                } catch (e) {
-                    setError("No hay datos en tu portfolio ni se pudo cargar el benchmark.");
-                    setData(null);
-                }
+                setUsingBenchmarkFallback(true);
+                const fallbackRes = await api.get(`/investments/analyze/${targetBench}${queryParams}`);
+                setData(fallbackRes.data);
             } else {
                 console.error(err);
                 setError(err.response?.data?.error || err.message || "No se pudo analizar el ticker. Verifica el símbolo.");
@@ -1026,9 +1018,32 @@ const QuantReport = () => {
 
     return (
         <div style={{ fontFamily: "'Inter', sans-serif", maxWidth: '1600px', margin: '0 auto', padding: isMobile ? '10px' : '20px', background: '#f8f9fa', minHeight: '100vh', overflowX: 'hidden' }}>
-            {/* Header */}
-            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                <h1 style={{ margin: 0, fontSize: '28px', color: '#111', fontWeight: '800' }}>Reporte Cuantitativo</h1>
+            {/* Header / Nav */}
+            <div style={{ background: 'white', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', minHeight: 48, padding: '0 10px', gap: 0, flexShrink: 0, flexWrap: 'wrap', marginBottom: '20px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingRight: 10, marginRight: 6, borderRight: '1px solid #E2E8F0', flexShrink: 0 }}>
+                    <div style={{ width: 24, height: 24, background: '#6366F1', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <PieChart size={13} color="white" />
+                    </div>
+                    <span style={{ fontWeight: 900, fontSize: 12, color: '#6366F1' }}>REPORTE CUANTITATIVO</span>
+                </div>
+                <div style={{ display: 'flex', flexShrink: 0 }}>
+                    {[
+                        { id: 'PORTFOLIO', l: 'REPORTE INVERSIÓN' },
+                        { id: 'OPTIMIZER', l: 'OPTIMIZADOR' },
+                        { id: 'RISK_ANALYSIS', l: 'RIESGO (MONTECARLO)' },
+                        { id: 'FINANCIALS', l: 'DATOS FINANCIEROS' }
+                    ].map(t => (
+                        <button key={t.id} onClick={() => {
+                            setMode(t.id);
+                            if (t.id === 'PORTFOLIO') setTicker('');
+                        }} style={{
+                            padding: '0 10px', height: 48, border: 'none', background: 'none', cursor: 'pointer',
+                            borderBottom: (mode === t.id || (t.id === 'PORTFOLIO' && mode === 'TICKER')) ? `3px solid #6366F1` : '3px solid transparent',
+                            color: (mode === t.id || (t.id === 'PORTFOLIO' && mode === 'TICKER')) ? '#6366F1' : '#94A3B8',
+                            fontWeight: 800, fontSize: 10, letterSpacing: '.4px', whiteSpace: 'nowrap',
+                        }}>{t.l}</button>
+                    ))}
+                </div>
             </div>
 
             {/* Main Layout Container */}
@@ -1061,24 +1076,7 @@ const QuantReport = () => {
                     }}>
                         <form onSubmit={handleSearch} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-                            {/* Analysis Mode */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                <label style={{ fontSize: '13px', color: '#444', fontWeight: '600' }}>Analysis Mode</label>
-                                <select
-                                    value={mode === 'TICKER' ? 'PORTFOLIO' : (['PORTFOLIO', 'OPTIMIZER', 'RISK_ANALYSIS'].includes(mode) ? mode : 'PORTFOLIO')}
-                                    onChange={(e) => {
-                                        const newMode = e.target.value;
-                                        setMode(newMode);
-                                        // Reset ticker if going back to portfolio
-                                        if (newMode === 'PORTFOLIO') setTicker('');
-                                    }}
-                                    style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #ddd', background: '#f8f9fa', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
-                                >
-                                    <option value="PORTFOLIO">Investment Report</option>
-                                    {!isMobile && <option value="OPTIMIZER">Portfolio Optimizer</option>}
-                                    <option value="RISK_ANALYSIS">Risk Analysis Montecarlo</option>
-                                </select>
-                            </div>
+
 
                             {/* Investment Report / Risk Analysis Asset Selector */}
                             {(mode === 'PORTFOLIO' || mode === 'TICKER' || mode === 'RISK_ANALYSIS') && (
@@ -1111,7 +1109,7 @@ const QuantReport = () => {
                             {/* Currency */}
                             {mode !== 'OPTIMIZER' && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <label style={{ fontSize: '13px', color: '#444', fontWeight: '600' }}>Currency</label>
+                                    <label style={{ fontSize: '13px', color: '#444', fontWeight: '600' }}>Moneda</label>
                                     <div style={{ display: 'flex', background: '#e1e1e6', borderRadius: '8px', padding: '4px' }}>
                                         <button type="button" onClick={() => setCurrency('USD')}
                                             style={{ flex: 1, padding: '6px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', background: currency === 'USD' ? 'white' : 'transparent', fontWeight: currency === 'USD' ? 'bold' : 'normal', boxShadow: currency === 'USD' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>USD</button>
@@ -1152,7 +1150,7 @@ const QuantReport = () => {
                                         <span style={{ fontSize: '11px', color: '#666', lineHeight: '1.4' }}>*Los activos de tu portfolio se agregan automáticamente al iniciar. Puedes añadir más separados por coma para comparar.</span>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                        <label style={{ fontSize: '13px', color: '#444', fontWeight: '600' }}>Currency</label>
+                                        <label style={{ fontSize: '13px', color: '#444', fontWeight: '600' }}>Moneda</label>
                                         <div style={{ display: 'flex', background: '#e1e1e6', borderRadius: '8px', padding: '4px' }}>
                                             <button type="button" onClick={() => setCurrency('USD')}
                                                 style={{ flex: 1, padding: '6px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', background: currency === 'USD' ? 'white' : 'transparent', fontWeight: currency === 'USD' ? 'bold' : 'normal', boxShadow: currency === 'USD' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>USD</button>
@@ -1176,25 +1174,25 @@ const QuantReport = () => {
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                <label style={{ fontSize: '13px', color: '#444', fontWeight: '600' }}>Years (Auto-Date)</label>
+                                <label style={{ fontSize: '13px', color: '#444', fontWeight: '600' }}>Años (Auto-Fecha)</label>
                                 <select value={years} onChange={e => { setYears(e.target.value); setStartDate(''); setEndDate(''); }} style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '14px', boxSizing: 'border-box' }}>
-                                    <option value="">Custom</option>
-                                    <option value="1">1 Year</option>
-                                    <option value="3">3 Years</option>
-                                    <option value="5">5 Years</option>
-                                    <option value="10">10 Years</option>
-                                    <option value="15">15 Years</option>
+                                    <option value="">Personalizado</option>
+                                    <option value="1">1 Año</option>
+                                    <option value="3">3 Años</option>
+                                    <option value="5">5 Años</option>
+                                    <option value="10">10 Años</option>
+                                    <option value="15">15 Años</option>
                                 </select>
                             </div>
 
                             <button type="submit" disabled={loading} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 16px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer', marginTop: '8px' }}>
                                 <Search size={18} style={{ marginRight: '6px' }} />
-                                {loading || optLoading ? 'Analizando...' : (mode === 'OPTIMIZER' ? 'Optimizar' : 'Run Analysis')}
+                                {loading || optLoading ? 'Analizando...' : (mode === 'OPTIMIZER' ? 'Optimizar' : 'Correr Análisis')}
                             </button>
 
                             <button type="button" onClick={handleExportPDF} disabled={!data} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 16px', background: '#333', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer', opacity: !data ? 0.5 : 1 }}>
                                 <Download size={18} style={{ marginRight: '6px' }} />
-                                Export PDF
+                                Exportar PDF
                             </button>
                         </form>
                     </div>
@@ -1204,15 +1202,7 @@ const QuantReport = () => {
                 <div style={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
                     {loading && <div style={{ padding: '40px', textAlign: 'center', color: '#666', background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>Analizando datos de mercado...</div>}
                     {error && <div style={{ padding: '20px', background: '#ffebee', color: '#c62828', borderRadius: '12px', marginBottom: '20px' }}>{error}</div>}
-                    {usingBenchmarkFallback && data && (
-                        <div style={{ padding: '14px 20px', background: '#e3f0ff', color: '#1565c0', borderRadius: '10px', border: '1px solid #90caf9', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
-                            <span style={{ fontSize: '18px' }}>ℹ️</span>
-                            <span>
-                                <strong>Tu portfolio no tiene datos registrados.</strong> Mostrando datos del benchmark <strong>{benchmark}</strong> como referencia.
-                                Añade inversiones desde la sección "Mis Inversiones" para ver tu portfolio.
-                            </span>
-                        </div>
-                    )}
+
 
 
 
@@ -1416,10 +1406,9 @@ const QuantReport = () => {
                                                                 Apply to Report
                                                             </button>
                                                         </div>
-                                                        <div style={{ marginBottom: '12px', fontSize: '14px' }}>
-                                                            <strong>Ret:</strong> {selectedPortfolioInfo.return.toFixed(2)}% |
-                                                            <strong> {optMetric === 'volatility' ? 'Vol' : 'Avg DD'}:</strong> {selectedPortfolioInfo.risk.toFixed(2)}%
-                                                        </div>
+                                                        <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
+                                                            <strong>Retorno Anual (CAGR):</strong> {selectedPortfolioInfo.return.toFixed(2)}% | <strong>Volatilidad:</strong> {selectedPortfolioInfo.risk.toFixed(2)}%
+                                                        </p>
                                                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                                                             <thead>
                                                                 <tr style={{ borderBottom: '1px solid #c0d1eb' }}><th style={{ textAlign: 'left', padding: '4px' }}>Ticker</th><th style={{ textAlign: 'right', padding: '4px' }}>Weight</th></tr>
@@ -1583,33 +1572,51 @@ const QuantReport = () => {
                                                     </table>
                                                 </div>
 
+                                                {seabornImage && (
+                                                    <div style={{ marginTop: '48px', width: '100%', textAlign: 'center' }}>
+                                                        <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '16px' }}>Pairplot de Retornos (Seaborn)</h3>
+                                                        <img
+                                                            src={`data:image/png;base64,${seabornImage}`}
+                                                            alt="Seaborn Pairplot"
+                                                            style={{ maxWidth: '100%', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                                        />
+                                                    </div>
+                                                )}
+
                                                 {correlationData.rawReturns && Object.keys(correlationData.rawReturns).length > 0 && (
                                                     <div style={{ marginTop: '48px', height: '600px', width: '100%' }}>
-                                                        <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '16px' }}>Pairplot de Retornos</h3>
-                                                        <Plot
-                                                            data={[{
-                                                                type: 'splom',
-                                                                dimensions: Object.keys(correlationData.rawReturns).map(ticker => ({
-                                                                    label: ticker,
-                                                                    values: correlationData.rawReturns[ticker]
-                                                                })),
-                                                                marker: {
-                                                                    color: '#10b981',
-                                                                    size: 3,
-                                                                    line: { color: 'white', width: 0.5 }
-                                                                },
-                                                                diagonal: { type: 'histogram' },
-                                                                showupperhalf: false
-                                                            }]}
-                                                            layout={{
-                                                                autosize: true,
-                                                                margin: { l: 40, r: 0, b: 40, t: 0 },
-                                                                dragmode: 'pan',
-                                                                hovermode: 'closest'
-                                                            }}
-                                                            style={{ width: "100%", height: "100%" }}
-                                                            config={{ responsive: true, displaylogo: false }}
-                                                        />
+                                                        <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '16px' }}>Pairplot de Retornos (Plotly)</h3>
+                                                        {seabornLoading && !seabornImage ? (
+                                                            <div style={{ padding: '40px', textAlign: 'center' }}>
+                                                                <div className="spinner" style={{ border: '3px solid #f3f3f3', borderTop: '3px solid #1e3a8a', borderRadius: '50%', width: '30px', height: '30px', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
+                                                                <p>Generando pairplot de Seaborn en el servidor...</p>
+                                                            </div>
+                                                        ) : (
+                                                            <Plot
+                                                                data={[{
+                                                                    type: 'splom',
+                                                                    dimensions: Object.keys(correlationData.rawReturns).map(ticker => ({
+                                                                        label: ticker,
+                                                                        values: correlationData.rawReturns[ticker]
+                                                                    })),
+                                                                    marker: {
+                                                                        color: '#10b981',
+                                                                        size: 3,
+                                                                        line: { color: 'white', width: 0.5 }
+                                                                    },
+                                                                    diagonal: { type: 'histogram' },
+                                                                    showupperhalf: false
+                                                                }]}
+                                                                layout={{
+                                                                    autosize: true,
+                                                                    margin: { l: 40, r: 0, b: 40, t: 0 },
+                                                                    dragmode: 'pan',
+                                                                    hovermode: 'closest'
+                                                                }}
+                                                                style={{ width: "100%", height: "100%" }}
+                                                                config={{ responsive: true, displaylogo: false }}
+                                                            />
+                                                        )}
                                                     </div>
                                                 )}
                                             </>
@@ -1709,13 +1716,29 @@ const QuantReport = () => {
                                                 </div>
                                             ) : walkforwardData ? (
                                                 <div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+                                                        <div style={{ flex: 1, minWidth: isMobile ? '100%' : '140px', background: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                                                            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px' }}>CAGR Anual (Rebalanceado)</div>
+                                                            <div style={{ fontSize: '18px', fontWeight: '800', color: walkforwardData.metrics.portfolioCAGR >= 0 ? '#10b981' : '#ef4444' }}>{(walkforwardData.metrics.portfolioCAGR * 100).toFixed(2)}%</div>
+                                                        </div>
+                                                        <div style={{ flex: 1, minWidth: isMobile ? '100%' : '140px', background: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                                                            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px' }}>CAGR Anual (Benchmark)</div>
+                                                            <div style={{ fontSize: '18px', fontWeight: '800', color: walkforwardData.metrics.benchmarkCAGR >= 0 ? '#10b981' : '#ef4444' }}>{(walkforwardData.metrics.benchmarkCAGR * 100).toFixed(2)}%</div>
+                                                        </div>
+                                                        <div style={{ flex: 1, minWidth: isMobile ? '100%' : '140px', background: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                                                            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px' }}>Max Drawdown</div>
+                                                            <div style={{ fontSize: '18px', fontWeight: '800', color: '#ef4444' }}>{(walkforwardData.metrics.portfolioMaxDrawdown * 100).toFixed(2)}%</div>
+                                                            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>Sharpe Walkforward: {((walkforwardData.metrics.portfolioCAGR * 100) / (Math.abs(walkforwardData.metrics.portfolioMaxDrawdown * 100) || 1)).toFixed(2)}</div>
+                                                        </div>
+                                                    </div>
+
                                                     <div style={{ height: isMobile ? '280px' : '380px', width: '100%', marginBottom: '32px' }}>
                                                         <Line
                                                             data={{
                                                                 labels: walkforwardData.dates || [],
                                                                 datasets: [
                                                                     {
-                                                                        label: 'Equity Rebalanceo (%)',
+                                                                        label: 'Equity Rebalanceo (Retorno Acumulado %)',
                                                                         data: walkforwardData.portfolioEquity?.map(v => ((v - 10000) / 10000) * 100) || [],
                                                                         borderColor: '#1e88e5',
                                                                         backgroundColor: 'rgba(30, 136, 229, 0.1)',
@@ -1725,7 +1748,7 @@ const QuantReport = () => {
                                                                         tension: 0.1
                                                                     },
                                                                     {
-                                                                        label: 'Cartera Estática (%)',
+                                                                        label: 'Cartera Estática (Retorno Acumulado %)',
                                                                         data: walkforwardData.staticEquity?.map(v => ((v - 10000) / 10000) * 100) || [],
                                                                         borderColor: '#9333ea',
                                                                         backgroundColor: 'transparent',
@@ -1735,22 +1758,12 @@ const QuantReport = () => {
                                                                         tension: 0.1
                                                                     },
                                                                     {
-                                                                        label: 'Benchmark SPY (%)',
+                                                                        label: 'Benchmark SPY (Retorno Acumulado %)',
                                                                         data: walkforwardData.benchmarkEquity?.map(v => ((v - walkforwardData.benchmarkEquity[0]) / walkforwardData.benchmarkEquity[0]) * 100) || [],
                                                                         borderColor: '#9ca3af',
                                                                         backgroundColor: 'transparent',
                                                                         fill: false,
                                                                         borderDash: [5, 5],
-                                                                        borderWidth: 1.5,
-                                                                        pointRadius: 0,
-                                                                        tension: 0.1
-                                                                    },
-                                                                    {
-                                                                        label: 'Baseline Equi-Weight (%)',
-                                                                        data: walkforwardData.baselineEquity?.map(v => ((v - 10000) / 10000) * 100) || [],
-                                                                        borderColor: '#f59e0b',
-                                                                        backgroundColor: 'transparent',
-                                                                        fill: false,
                                                                         borderWidth: 1.5,
                                                                         pointRadius: 0,
                                                                         tension: 0.1
@@ -1766,7 +1779,7 @@ const QuantReport = () => {
                                                                         mode: 'index',
                                                                         intersect: false,
                                                                         callbacks: {
-                                                                            label: (ctx) => `${ctx.dataset.label.replace(' (%)', '')}: ${ctx.raw.toFixed(2)}%`
+                                                                            label: (ctx) => `${ctx.dataset.label.replace(' (Retorno Acumulado %)', '')}: ${ctx.raw.toFixed(2)}%`
                                                                         }
                                                                     }
                                                                 },
@@ -1994,13 +2007,17 @@ const QuantReport = () => {
                                                                         </tr>
                                                                     </thead>
                                                                     <tbody>
-                                                                        {[...wfMatrixData.results].sort((a, b) => b[wfMatrixMetric] - a[wfMatrixMetric]).map((r, idx) => (
+                                                                        {(wfMatrixData.results || []).sort((a, b) => {
+                                                                            const valA = a[wfMatrixMetric] ?? -999;
+                                                                            const valB = b[wfMatrixMetric] ?? -999;
+                                                                            return valB - valA;
+                                                                        }).map((r, idx) => (
                                                                             <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx === 0 ? '#f0fdf4' : 'transparent' }}>
                                                                                 <td style={{ padding: '12px', textAlign: 'center', fontWeight: '500', color: '#1e3a8a' }}>{r.rebalance}</td>
                                                                                 <td style={{ padding: '12px', textAlign: 'center' }}>{r.assets}</td>
-                                                                                <td style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: r.return >= 0 ? '#10b981' : '#ef4444' }}>{r.return.toFixed(2)}%</td>
-                                                                                <td style={{ padding: '12px', textAlign: 'right', color: '#ef4444' }}>{r.maxDD.toFixed(2)}%</td>
-                                                                                <td style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold' }}>{r.sharpe.toFixed(2)}</td>
+                                                                                <td style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: (r.return ?? 0) >= 0 ? '#10b981' : '#ef4444' }}>{(r.return ?? 0).toFixed(2)}%</td>
+                                                                                <td style={{ padding: '12px', textAlign: 'right', color: '#ef4444' }}>{(r.maxDD ?? 0).toFixed(2)}%</td>
+                                                                                <td style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold' }}>{(r.sharpe ?? 0).toFixed(2)}</td>
                                                                             </tr>
                                                                         ))}
                                                                     </tbody>
@@ -2659,25 +2676,26 @@ const QuantReport = () => {
                                                     data={{
                                                         labels: data.cumulativeReturns?.map(d => d.date) || [],
                                                         datasets: [
-                                                            {
+                                                            !usingBenchmarkFallback && {
                                                                 label: strategyLabel,
                                                                 data: data.cumulativeReturns?.map(d => d.value * 100) || [],
                                                                 borderColor: '#1E88E5',
                                                                 backgroundColor: 'rgba(30, 136, 229, 0.1)',
                                                                 borderWidth: 2,
                                                                 tension: 0.1,
+                                                                fill: true,
                                                                 pointRadius: 0
                                                             },
                                                             {
                                                                 label: benchmarkLabel,
                                                                 data: data.benchmarkCumulativeReturns?.map(d => d.value * 100) || [],
-                                                                borderColor: '#fbbf24',
-                                                                backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                                                                borderColor: '#FFD700',
                                                                 borderWidth: 2,
+                                                                borderDash: [5, 5],
                                                                 tension: 0.1,
                                                                 pointRadius: 0
                                                             }
-                                                        ]
+                                                        ].filter(Boolean)
                                                     }}
                                                     options={{
                                                         ...chartOptions,
@@ -2767,13 +2785,13 @@ const QuantReport = () => {
                                                                         backgroundColor: '#fbbf24',
                                                                         order: 2
                                                                     },
-                                                                    {
+                                                                    !usingBenchmarkFallback && {
                                                                         label: strategyLabel,
                                                                         data: annuals.map(r => parseFloat(r.strategy)),
                                                                         backgroundColor: '#1E88E5',
                                                                         order: 3
                                                                     },
-                                                                    {
+                                                                    !usingBenchmarkFallback && {
                                                                         type: 'line',
                                                                         label: 'Average (Strategy)',
                                                                         data: avgLine,
@@ -2783,7 +2801,7 @@ const QuantReport = () => {
                                                                         pointRadius: 0,
                                                                         order: 1
                                                                     }
-                                                                ]
+                                                                ].filter(Boolean)
                                                             };
                                                         })()}
                                                         options={{
@@ -2823,15 +2841,27 @@ const QuantReport = () => {
                                                                 labels: distData.labels.map(l => l.toFixed(1) + '%'),
                                                                 datasets: [
                                                                     // Strategy KDE
-                                                                    {
+                                                                    !usingBenchmarkFallback && {
                                                                         type: 'line',
                                                                         label: `${strategyLabel} (KDE)`,
                                                                         data: distData.stratKDE,
                                                                         borderColor: '#000000',
                                                                         borderWidth: 1,
                                                                         tension: 0.4,
+                                                                        fill: true,
+                                                                        backgroundColor: 'rgba(0, 0, 0, 0.05)',
                                                                         pointRadius: 0,
                                                                         order: 1
+                                                                    },
+                                                                    // Strategy Histogram
+                                                                    !usingBenchmarkFallback && {
+                                                                        type: 'bar',
+                                                                        label: `${strategyLabel} (Dist)`,
+                                                                        data: distData.stratHist,
+                                                                        backgroundColor: '#618ac9',
+                                                                        categoryPercentage: 0.8,
+                                                                        barPercentage: 0.8,
+                                                                        order: 3
                                                                     },
                                                                     // Benchmark KDE
                                                                     {
@@ -2839,36 +2869,22 @@ const QuantReport = () => {
                                                                         label: `${benchmarkLabel} (KDE)`,
                                                                         data: distData.benchKDE,
                                                                         borderColor: '#fbbf24',
-                                                                        borderWidth: 1,
+                                                                        borderWidth: 1.5,
                                                                         tension: 0.4,
                                                                         pointRadius: 0,
                                                                         order: 2
                                                                     },
-                                                                    // Strategy Bars
+                                                                    // Benchmark Histogram
                                                                     {
                                                                         type: 'bar',
-                                                                        label: strategyLabel,
-                                                                        data: distData.stratDist,
-                                                                        backgroundColor: '#1E88E5',
-                                                                        borderColor: 'white',
-                                                                        borderWidth: 1,
-                                                                        categoryPercentage: 1.0,
-                                                                        barPercentage: 1.0,
-                                                                        order: 3
-                                                                    },
-                                                                    // Benchmark Bars
-                                                                    {
-                                                                        type: 'bar',
-                                                                        label: benchmarkLabel,
-                                                                        data: distData.benchDist,
-                                                                        backgroundColor: 'rgba(251, 191, 36, 0.6)',
-                                                                        borderColor: 'white',
-                                                                        borderWidth: 1,
-                                                                        categoryPercentage: 1.0,
-                                                                        barPercentage: 1.0,
+                                                                        label: `${benchmarkLabel} (Dist)`,
+                                                                        data: distData.benchHist,
+                                                                        backgroundColor: 'rgba(251, 191, 36, 0.3)',
+                                                                        categoryPercentage: 0.8,
+                                                                        barPercentage: 0.8,
                                                                         order: 4
                                                                     }
-                                                                ]
+                                                                ].filter(Boolean)
                                                             };
                                                         })()}
                                                         options={{
@@ -3008,7 +3024,7 @@ const QuantReport = () => {
                                                     data={{
                                                         labels: data.cumulativeReturns?.map(d => d.date) || [],
                                                         datasets: [
-                                                            {
+                                                            !usingBenchmarkFallback && {
                                                                 type: 'line',
                                                                 label: strategyLabel,
                                                                 data: (() => {
@@ -3044,7 +3060,6 @@ const QuantReport = () => {
                                                                 borderWidth: 2,
                                                                 tension: 0.1,
                                                                 pointRadius: 0,
-                                                                hidden: false,
                                                                 order: 3
                                                             },
                                                             {
@@ -3551,7 +3566,7 @@ const QuantReport = () => {
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 
