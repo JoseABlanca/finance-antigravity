@@ -52,19 +52,25 @@ const getMimeType = (filePath) => {
 
 router.post('/upload', upload.single('receipt'), async (req, res) => {
     try {
+        console.log('[AI-Tickets] Inicio de procesamiento de ticket');
+        
         if (!req.file) {
+            console.error('[AI-Tickets] Error: No se ha recibido ningún archivo');
             return res.status(400).json({ error: 'No image file uploaded.' });
         }
 
-        if (!process.env.GEMINI_API_KEY) {
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            console.error('[AI-Tickets] Error: GEMINI_API_KEY no configurada');
             return res.status(500).json({ error: 'GEMINI_API_KEY is not configured in the server.' });
         }
+        console.log(`[AI-Tickets] API Key verificada (termina en: ${apiKey.substring(apiKey.length - 4)})`);
 
         const filePath = req.file.path;
-        console.log(`Processing receipt: ${filePath}`);
+        const mimeType = getMimeType(filePath);
+        console.log(`[AI-Tickets] Procesando archivo: ${filePath} (Mime: ${mimeType})`);
         
         // 1. Convert image to Gemini part
-        const mimeType = getMimeType(filePath);
         const imagePart = fileToGenerativePart(filePath, mimeType);
 
         // 2. Define the schema for structured output
@@ -107,17 +113,31 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
         // 3. Call Gemini API
         const prompt = "Analyze this receipt image. Extract the date, supermarket name, total amount, and a detailed list of all purchased items including their prices and quantities. Return the data adhering strictly to the JSON schema requested.";
         
+        console.log('[AI-Tickets] Llamando a Gemini API...');
         const response = await ai.getGenerativeModel({ model: 'gemini-1.5-flash' }).generateContent({
             contents: [prompt, imagePart],
             generationConfig: {
                 responseMimeType: "application/json",
+                // Note: responseSchema can sometimes be finicky depending on the model/sdk version
+                // but we'll try to keep it for structured output
                 responseSchema: responseSchema,
             }
         });
 
-        const extractedData = JSON.parse(response.response.text());
+        const textResponse = response.response.text();
+        console.log('[AI-Tickets] Respuesta recibida de Gemini');
+        
+        let extractedData;
+        try {
+            extractedData = JSON.parse(textResponse);
+        } catch (parseError) {
+            console.error('[AI-Tickets] Error al parsear JSON:', parseError.message);
+            console.error('[AI-Tickets] Raw Response:', textResponse);
+            return res.status(500).json({ error: 'AI returned invalid JSON', details: textResponse });
+        }
         
         // 4. Save to Database
+        console.log(`[AI-Tickets] Guardando ticket de ${extractedData.supermarket} en DB...`);
         const imageUrl = `/uploads/${path.basename(filePath)}`;
         
         // Insert Header
@@ -132,6 +152,7 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
         );
         
         const receiptId = result.lastInsertRowid;
+        console.log(`[AI-Tickets] Header guardado con ID: ${receiptId}`);
         
         // Insert Items
         if (extractedData.items && extractedData.items.length > 0) {
@@ -150,6 +171,7 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
                     item.category || 'Other'
                 );
             });
+            console.log(`[AI-Tickets] ${extractedData.items.length} productos guardados.`);
         }
         
         res.json({
@@ -160,8 +182,12 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error processing ticket:', error);
-        res.status(500).json({ error: 'Failed to process receipt via AI', details: error.message });
+        console.error('[AI-Tickets] ERROR CRÍTICO:', error);
+        res.status(500).json({ 
+            error: 'Failed to process receipt via AI', 
+            details: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 
