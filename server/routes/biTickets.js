@@ -22,8 +22,8 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// Initialize Gemini API
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Initialize Gemini API - Simpler and more standard initialization
+const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY);
 
 // Utility to convert local file to Gemini API part format
 function fileToGenerativePart(filePath, mimeType) {
@@ -50,6 +50,19 @@ const getMimeType = (filePath) => {
     }
 };
 
+// Route to check server status and AI configuration
+router.get('/debug-status', (req, res) => {
+    const hasKey = !!process.env.GEMINI_API_KEY;
+    const keyPrefix = hasKey ? process.env.GEMINI_API_KEY.substring(0, 6) : 'N/A';
+    res.json({
+        status: 'ok',
+        ai_configured: hasKey,
+        key_prefix: keyPrefix,
+        node_env: process.env.NODE_ENV,
+        timestamp: new Date().toISOString()
+    });
+});
+
 router.post('/upload', upload.single('receipt'), async (req, res) => {
     try {
         console.log('[AI-Tickets] Inicio de procesamiento de ticket');
@@ -64,7 +77,7 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
             console.error('[AI-Tickets] Error: GEMINI_API_KEY no configurada');
             return res.status(500).json({ error: 'GEMINI_API_KEY is not configured in the server.' });
         }
-        console.log(`[AI-Tickets] API Key verificada (termina en: ${apiKey.substring(apiKey.length - 4)})`);
+        console.log(`[AI-Tickets] API Key detectada (longitud: ${apiKey.length})`);
 
         const filePath = req.file.path;
         const mimeType = getMimeType(filePath);
@@ -73,35 +86,23 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
         // 1. Convert image to Gemini part
         const imagePart = fileToGenerativePart(filePath, mimeType);
 
-        // 2. Define the schema for structured output
+        // 2. Define the schema for structured output (moved inside for freshness)
         const responseSchema = {
             type: Type.OBJECT,
             properties: {
-                receipt_date: {
-                    type: Type.STRING,
-                    description: "The date of the receipt in YYYY-MM-DD format."
-                },
-                supermarket: {
-                    type: Type.STRING,
-                    description: "The name of the supermarket or store."
-                },
-                total_amount: {
-                    type: Type.NUMBER,
-                    description: "The total amount paid."
-                },
+                receipt_date: { type: Type.STRING },
+                supermarket: { type: Type.STRING },
+                total_amount: { type: Type.NUMBER },
                 items: {
                     type: Type.ARRAY,
                     items: {
                         type: Type.OBJECT,
                         properties: {
                             product_name: { type: Type.STRING },
-                            quantity: { type: Type.NUMBER, description: "Quantity or weight. If not specified but there's a price, assume 1." },
-                            price_per_unit: { type: Type.NUMBER, description: "Price per unit/kg. If not specified, use total_price." },
-                            total_price: { type: Type.NUMBER, description: "Total price paid for this specific line item." },
-                            category: { 
-                                type: Type.STRING, 
-                                description: "Assign a broad grocery category like 'Meat', 'Dairy', 'Produce', 'Bakery', 'Drinks', 'Pantry', 'Cleaning', 'Personal Care', etc." 
-                            }
+                            quantity: { type: Type.NUMBER },
+                            price_per_unit: { type: Type.NUMBER },
+                            total_price: { type: Type.NUMBER },
+                            category: { type: Type.STRING }
                         },
                         required: ["product_name", "quantity", "total_price", "category"]
                     }
@@ -110,21 +111,28 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
             required: ["receipt_date", "supermarket", "total_amount", "items"]
         };
 
-        // 3. Call Gemini API
-        const prompt = "Analyze this receipt image. Extract the date, supermarket name, total amount, and a detailed list of all purchased items including their prices and quantities. Return the data adhering strictly to the JSON schema requested.";
+        // 3. Call Gemini API - Using more robust structure
+        const promptText = "Analyze this receipt image. Extract the date (YYYY-MM-DD), supermarket name, total amount, and a detailed list of items. Return as JSON.";
         
-        console.log('[AI-Tickets] Llamando a Gemini API...');
-        const response = await ai.getGenerativeModel({ model: 'gemini-1.5-flash' }).generateContent({
-            contents: [prompt, imagePart],
+        console.log('[AI-Tickets] Llamando a Gemini API (gemini-1.5-flash)...');
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        
+        const result = await model.generateContent({
+            contents: [{ 
+                role: 'user', 
+                parts: [
+                    { text: promptText },
+                    imagePart
+                ] 
+            }],
             generationConfig: {
                 responseMimeType: "application/json",
-                // Note: responseSchema can sometimes be finicky depending on the model/sdk version
-                // but we'll try to keep it for structured output
+                // schema is optional but helpful if supported
                 responseSchema: responseSchema,
             }
         });
 
-        const textResponse = response.response.text();
+        const textResponse = result.response.text();
         console.log('[AI-Tickets] Respuesta recibida de Gemini');
         
         let extractedData;
@@ -132,16 +140,19 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
             extractedData = JSON.parse(textResponse);
         } catch (parseError) {
             console.error('[AI-Tickets] Error al parsear JSON:', parseError.message);
-            console.error('[AI-Tickets] Raw Response:', textResponse);
-            return res.status(500).json({ error: 'AI returned invalid JSON', details: textResponse });
+            console.error('[AI-Tickets] Raw Content:', textResponse);
+            return res.status(500).json({ 
+                error: 'AI returned invalid JSON', 
+                details: parseError.message,
+                raw: textResponse 
+            });
         }
         
         // 4. Save to Database
         console.log(`[AI-Tickets] Guardando ticket de ${extractedData.supermarket} en DB...`);
         const imageUrl = `/uploads/${path.basename(filePath)}`;
         
-        // Insert Header
-        const result = db.prepare(`
+        const headerResult = db.prepare(`
             INSERT INTO receipts (date, supermarket, total_amount, image_url) 
             VALUES (?, ?, ?, ?)
         `).run(
@@ -151,7 +162,7 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
             imageUrl
         );
         
-        const receiptId = result.lastInsertRowid;
+        const receiptId = headerResult.lastInsertRowid;
         console.log(`[AI-Tickets] Header guardado con ID: ${receiptId}`);
         
         // Insert Items
@@ -186,7 +197,7 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
         res.status(500).json({ 
             error: 'Failed to process receipt via AI', 
             details: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            code: error.status || error.code || 'UNKNOWN_ERROR'
         });
     }
 });

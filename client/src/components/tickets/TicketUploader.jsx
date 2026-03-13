@@ -67,12 +67,15 @@ const TicketUploader = ({ onSuccess }) => {
             const backendError = err.response?.data?.error;
             const backendDetails = err.response?.data?.details;
             
-            if (backendError === 'GEMINI_API_KEY is not configured in the server.') {
-                setError('Error: La API de Gemini no está configurada en Render. Por favor, revisa las variables de entorno.');
+            // Si el backend nos dio un error específico de procesamiento de IA
+            if (backendError === 'Failed to process receipt via AI' && backendDetails) {
+                setError(`Error de IA: ${backendDetails}`);
+            } else if (backendError === 'GEMINI_API_KEY is not configured in the server.') {
+                setError('Error: La API de Gemini no está configurada en Render.');
             } else if (backendError === 'AI returned invalid JSON') {
-                setError('La Inteligencia Artificial no ha podido extraer datos de esta imagen. Asegúrate de que sea una foto clara de un ticket de compra.');
+                setError('La IA no ha podido entender la imagen. ¿Es un ticket de compra claro?');
             } else {
-                setError(backendError || backendDetails || 'Error al procesar el ticket. Asegúrate de tener conexión y de que la imagen sea un ticket válido.');
+                setError(backendDetails || backendError || 'Error al procesar el ticket. Revisa tu conexión y la imagen.');
             }
         } finally {
             setIsUploading(false);
