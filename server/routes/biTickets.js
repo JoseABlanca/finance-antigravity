@@ -92,7 +92,7 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
         // 3. Call Gemini API with Retry Logic for 429 errors
         const promptText = "Analyze this receipt image. Extract the date (YYYY-MM-DD), supermarket name, total amount, and a detailed list of items. Return as JSON.";
         
-        addLog('INFO', 'AI-Tickets', 'Llamando a Gemini (gemini-2.0-flash) con reintentos...');
+        addLog('INFO', 'AI-Tickets', 'Llamando a Gemini (gemini-1.5-flash) con reintentos...');
         
         // Initial delay to avoid rapid-fire requests hitting the quota
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -104,7 +104,7 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
         while (attempts < maxAttempts) {
             try {
                 result = await genAI.models.generateContent({
-                    model: 'gemini-2.0-flash',
+                    model: 'gemini-1.5-flash',
                     contents: [{ 
                         role: 'user', 
                         parts: [

@@ -127,7 +127,7 @@ async function processUnreadEmails() {
                 Subject: ${subject}
                 Body: ${emailText}`;
 
-                const modelName = 'gemini-2.0-flash';
+                const modelName = 'gemini-1.5-flash';
                 addLog('DEBUG', 'EmailService', `Llamando a Gemini (${modelName})...`);
 
                 let result;
@@ -136,8 +136,8 @@ async function processUnreadEmails() {
                 
                 while (attempts < maxAttempts) {
                     try {
-                        // Base delay of 3s + exponential wait based on attempts
-                        const baseWait = attempts === 0 ? 0 : Math.pow(2, attempts) * 2000 + Math.random() * 1000;
+                        // Exponential backoff
+                        const baseWait = attempts === 0 ? 0 : Math.pow(2, attempts) * 3000 + Math.random() * 2000;
                         if (baseWait > 0) {
                             addLog('DEBUG', 'EmailService', `Esperando ${Math.round(baseWait/1000)}s antes de reintentar (Intento ${attempts + 1}/${maxAttempts})`);
                             await new Promise(resolve => setTimeout(resolve, baseWait));
@@ -157,8 +157,7 @@ async function processUnreadEmails() {
                         const isQuotaError = error.message?.includes('429') || error.status === 429 || error.code === 429;
                         
                         if (isQuotaError && attempts < maxAttempts) {
-                            addLog('WARN', 'EmailService', `Cuota excedida (429) en Gemini. Reintentando...`);
-                            // Loop continues
+                            addLog('WARN', 'EmailService', `Cuota excedida (429) en Gemini 1.5. Reintentando...`);
                         } else {
                             throw error; // Rethrow if not a quota error or max attempts reached
                         }
