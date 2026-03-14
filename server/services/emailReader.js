@@ -155,15 +155,15 @@ async function processUnreadEmails() {
                             
                             const insertLine = db.prepare(`INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`);
                             
-                            // Bank Mapping
+                            // Bank Mapping with specific IDs from user
                             const BANK_IDS = {
-                                "BBVA": 100,
-                                "TradeRepublic": 101,
-                                "Sabadell": 102,
-                                "Unknown": 100 // Default to BBVA if unknown
+                                "BBVA": 106,
+                                "TradeRepublic": 108,
+                                "Sabadell": 107,
+                                "Unknown": 106 // Default to BBVA if unknown
                             };
-                            const bankAccountId = BANK_IDS[data.bank_name] || 100;
-                            const EXPENSE_ACC = 104; // Compras de mercaderías
+                            const bankAccountId = BANK_IDS[data.bank_name] || 106;
+                            const EXPENSE_ACC = 104; // Compras de mercaderías (Code 600)
                             const INCOME_ACC = 34; // Ingresos por Servicios (fallback)
 
                             if (data.is_expense) {
