@@ -3,8 +3,8 @@ const simpleParser = require('mailparser').simpleParser;
 const { GoogleGenAI, Type } = require('@google/genai');
 const db = require('../db');
 
-// Corrected initialization: pass object with apiKey, not just the string
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Initialize Gemini API
+const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 async function getSettings() {
     try {
@@ -14,7 +14,6 @@ async function getSettings() {
             return acc;
         }, {});
     } catch (err) {
-        console.error('[EmailService] Error fetching settings:', err.message);
         return {};
     }
 }
@@ -25,11 +24,11 @@ async function processUnreadEmails() {
     const imapPass = settings.IMAP_PASSWORD || process.env.IMAP_PASSWORD;
 
     if (!imapUser || !imapPass) {
-        console.log('[EmailService] Saltando lectura de emails: Credenciales IMAP no configuradas (ni en DB ni en .env)');
+        addLog('WARN', 'EmailService', 'Credenciales IMAP no configuradas.');
         return;
     }
     if (!process.env.GEMINI_API_KEY) {
-        console.log('[EmailService] Saltando lectura de emails: GEMINI_API_KEY no configurada');
+        addLog('WARN', 'EmailService', 'GEMINI_API_KEY no configurada.');
         return;
     }
 
@@ -40,19 +39,19 @@ async function processUnreadEmails() {
             host: 'imap.gmail.com',
             port: 993,
             tls: true,
-            authTimeout: 3000,
+            authTimeout: 5000,
             tlsOptions: { rejectUnauthorized: false }
         }
     };
 
-    console.log(`[EmailService] Conectando a ${imapUser}...`);
+    addLog('INFO', 'EmailService', `Conectando a IMAP: ${imapUser}`);
     let connection;
     
     try {
         connection = await imaps.connect(config);
         await connection.openBox('INBOX');
 
-        // Search emails from last 2 days (not just UNSEEN, so we catch emails opened in Gmail)
+        // Search last 2 days
         const sinceDate = new Date();
         sinceDate.setDate(sinceDate.getDate() - 2);
         const searchCriteria = [['SINCE', sinceDate]];
@@ -63,7 +62,7 @@ async function processUnreadEmails() {
         };
 
         const messages = await connection.search(searchCriteria, fetchOptions);
-        console.log(`[EmailService] Encontrados ${messages.length} correos en los últimos 2 días.`);
+        addLog('INFO', 'EmailService', `Encontrados ${messages.length} correos en 48h.`);
 
         for (const item of messages) {
             const all = item.parts.find(p => p.which === '');
@@ -76,28 +75,26 @@ async function processUnreadEmails() {
                 const receivedAt = parsedMail.date ? parsedMail.date.toISOString() : new Date().toISOString();
                 const subject = parsedMail.subject || '(Sin asunto)';
 
-                // DEDUPLICATION: Check if this email was already processed
+                // DEDUPLICATION
                 const existing = db.prepare('SELECT id FROM email_alerts WHERE sender = ? AND subject = ? AND received_at = ?').get(senderAddress, subject, receivedAt);
-                if (existing) {
-                    console.log(`[EmailService] Saltando correo UID ${id}: Ya procesado previamente (ID Alerta: ${existing.id})`);
-                    continue;
-                }
+                if (existing) continue;
 
-                console.log(`[EmailService] Procesando correo UID ${id}: "${subject}"`);
+                addLog('DEBUG', 'EmailService', `Procesando: "${subject}" de ${senderAddress}`);
                 
                 let emailText = parsedMail.text || parsedMail.textAsHtml || '';
                 if (emailText.length > 3000) emailText = emailText.substring(0, 3000);
                 
-                let imagePart = null;
+                let attachmentPart = null;
                 const attachments = parsedMail.attachments || [];
                 for (const att of attachments) {
                     if (att.contentType.startsWith('image/') || att.contentType === 'application/pdf') {
-                        imagePart = {
+                        attachmentPart = {
                             inlineData: {
                                 data: att.content.toString("base64"),
                                 mimeType: att.contentType
                             }
                         };
+                        addLog('DEBUG', 'EmailService', `Adjunto detectado: ${att.filename} (${att.contentType})`);
                         break;
                     }
                 }
@@ -115,86 +112,63 @@ async function processUnreadEmails() {
                     required: ["is_invoice_or_receipt", "date", "amount", "concept", "is_expense", "vendor"]
                 };
 
-                const promptText = `Analiza este correo y determina si es una factura o justificante de pago:
-                Subject: ${parsedMail.subject}
+                const promptText = `Analiza este correo y cualquier adjunto para determinar si es una factura o justificante de pago.
+                Subject: ${subject}
                 Body: ${emailText}`;
 
-                const contents = [{ role: 'user', parts: [{ text: promptText }] }];
-                if (imagePart) {
-                    contents[0].parts.push(imagePart);
-                }
-
-                // Use new API syntax: genAI.models.generateContent
-                const response = await ai.models.generateContent({
+                const model = genAI.getGenerativeModel({ 
                     model: 'gemini-2.0-flash',
-                    contents: contents,
-                    config: {
+                    generationConfig: {
                         responseMimeType: "application/json",
                         responseSchema: responseSchema,
                     }
                 });
 
-                const data = JSON.parse(response.text);
+                const contents = [ { text: promptText } ];
+                if (attachmentPart) contents.push(attachmentPart);
+
+                const result = await model.generateContent(contents);
+                const data = JSON.parse(result.response.text());
 
                 if (data.is_invoice_or_receipt) {
-                    console.log(`[EmailService] Factura/justificante detectado: ${data.vendor} - ${data.amount}€`);
+                    addLog('INFO', 'EmailService', `Factura detectada: ${data.vendor} - ${data.amount}€`);
                     
                     let journalEntryId = null;
-
-                    // Only create accounting entry if amount > 0
                     if (data.amount > 0) {
-                        const conceptHeader = `Auto: ${data.vendor} - ${data.concept}`;
-                        const MAIN_BANK_ACCOUNT = 1;
-                        const EXPENSE_ACCOUNT = 33;
-                        const INCOME_ACCOUNT = 34;
-
                         try {
-                            const entryResult = db.prepare(`INSERT INTO journal_entries (date, comment) VALUES (?, ?)`).run(data.date, conceptHeader);
+                            const entryResult = db.prepare(`INSERT INTO journal_entries (date, comment) VALUES (?, ?)`).run(data.date, `Auto: ${data.vendor} - ${data.concept}`);
                             journalEntryId = entryResult.lastInsertRowid;
                             const insertLine = db.prepare(`INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`);
-
+                            const MAIN_BANK = 1;
                             if (data.is_expense) {
-                                insertLine.run(journalEntryId, EXPENSE_ACCOUNT, data.amount, 0);
-                                insertLine.run(journalEntryId, MAIN_BANK_ACCOUNT, 0, data.amount);
+                                insertLine.run(journalEntryId, 33, data.amount, 0);
+                                insertLine.run(journalEntryId, MAIN_BANK, 0, data.amount);
                             } else {
-                                insertLine.run(journalEntryId, MAIN_BANK_ACCOUNT, data.amount, 0);
-                                insertLine.run(journalEntryId, INCOME_ACCOUNT, 0, data.amount);
+                                insertLine.run(journalEntryId, MAIN_BANK, data.amount, 0);
+                                insertLine.run(journalEntryId, 34, 0, data.amount);
                             }
-                            console.log(`[EmailService] Asiento Contable #${journalEntryId} creado.`);
                         } catch (dbErr) {
-                            console.error('[EmailService] Error creating journal entry:', dbErr.message);
+                            addLog('ERROR', 'EmailService', `Error DB: ${dbErr.message}`);
                         }
                     }
 
-                    // Save alert to email_alerts table
-                    try {
-                        db.prepare(`
-                            INSERT INTO email_alerts (received_at, sender, subject, vendor, amount, is_expense, journal_entry_id, status)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, 'unread')
-                        `).run(
-                            receivedAt,
-                            senderAddress,
-                            subject,
-                            data.vendor || 'Desconocido',
-                            data.amount || 0,
-                            data.is_expense ? 1 : 0,
-                            journalEntryId
-                        );
-                        console.log(`[EmailService] Alerta guardada para: ${senderAddress}`);
-                    } catch (alertErr) {
-                        console.error('[EmailService] Error saving alert (tabla puede no existir aún):', alertErr.message);
-                    }
+                    db.prepare(`
+                        INSERT INTO email_alerts (received_at, sender, subject, vendor, amount, is_expense, journal_entry_id, status)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, 'unread')
+                    `).run(receivedAt, senderAddress, subject, data.vendor, data.amount, data.is_expense ? 1 : 0, journalEntryId);
+                    
+                    addLog('SUCCESS', 'EmailService', `Alerta guardada para ${subject}`);
                 }
                 
-                // Mark email as seen in IMAP
+                // Mark as seen only IF we processed it or it's not a bill
                 await connection.addFlags(id, ['\\Seen']);
 
             } catch (err) {
-                console.error(`[EmailService] Error UID ${id}:`, err.message);
+                addLog('ERROR', 'EmailService', `Error en UID ${id}: ${err.message}`);
             }
         }
     } catch (err) {
-        console.error('[EmailService] Connection Error:', err.message);
+        addLog('ERROR', 'EmailService', `Error IMAP: ${err.message}`);
     } finally {
         if (connection) connection.end();
     }

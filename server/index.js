@@ -9,24 +9,47 @@ const { processUnreadEmails } = require('./services/emailReader');
 
 // Ensure email_alerts table exists (safe to run each startup)
 try {
-    db.exec(`
+    db.prepare(`
         CREATE TABLE IF NOT EXISTS email_alerts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            received_at TEXT NOT NULL,
+            received_at TEXT,
             sender TEXT,
             subject TEXT,
             vendor TEXT,
-            amount REAL DEFAULT 0,
-            is_expense INTEGER DEFAULT 1,
+            amount REAL,
+            is_expense INTEGER,
             journal_entry_id INTEGER,
             status TEXT DEFAULT 'unread',
-            created_at TEXT DEFAULT (datetime('now'))
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
-    `);
-    console.log('[DB] Tabla email_alerts verificada/creada.');
-} catch (e) {
-    console.error('[DB] Error creando tabla email_alerts:', e.message);
+    `).run();
+
+    db.prepare(`
+        CREATE TABLE IF NOT EXISTS system_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            level TEXT,
+            context TEXT,
+            message TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    `).run();
+    
+    console.log('Tablas del sistema verificadas/creadas.');
+} catch (err) {
+    console.error('Error en migraciones:', err.message);
 }
+
+// Global logger to DB
+global.addLog = (level, context, message) => {
+    try {
+        db.prepare('INSERT INTO system_logs (level, context, message) VALUES (?, ?, ?)').run(level, context, message);
+        console.log(`[${level}] [${context}] ${message}`);
+    } catch (e) {
+        console.error('Error loggin to DB:', e.message);
+    }
+};
+
+addLog('INFO', 'Server', 'Aplicación iniciada correctamente');
 
 const app = express();
 const PORT = process.env.PORT || 3001;

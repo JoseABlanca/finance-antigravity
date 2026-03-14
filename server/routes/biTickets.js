@@ -23,7 +23,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// Initialize Gemini API - corrected initialization with object param
+// Initialize Gemini API
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // Utility to convert local file to Gemini API part format
@@ -43,51 +43,28 @@ const getMimeType = (filePath) => {
         case '.png': return 'image/png';
         case '.jpeg':
         case '.jpg': return 'image/jpeg';
-        case '.webp': return 'image/webp';
-        case '.heic': return 'image/heic';
-        case '.heif': return 'image/heif';
         case '.pdf': return 'application/pdf';
-        default: return 'application/octet-stream';
+        default: return 'image/jpeg';
     }
 };
 
-// Route to check server status and AI configuration
-router.get('/debug-status', (req, res) => {
-    const hasKey = !!process.env.GEMINI_API_KEY;
-    const keyPrefix = hasKey ? process.env.GEMINI_API_KEY.substring(0, 6) : 'N/A';
-    res.json({
-        status: 'ok',
-        ai_configured: hasKey,
-        key_prefix: keyPrefix,
-        node_env: process.env.NODE_ENV,
-        timestamp: new Date().toISOString()
-    });
-});
-
+/**
+ * POST /api/bi/tickets/upload
+ * Subida y procesamiento de ticket con Gemini AI
+ */
 router.post('/upload', upload.single('receipt'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No request file provided' });
+    }
+
+    const filePath = req.file.path;
+    const mimeType = getMimeType(filePath);
+
     try {
-        console.log('[AI-Tickets] Inicio de procesamiento de ticket');
-        
-        if (!req.file) {
-            console.error('[AI-Tickets] Error: No se ha recibido ningún archivo');
-            return res.status(400).json({ error: 'No image file uploaded.' });
-        }
-
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-            console.error('[AI-Tickets] Error: GEMINI_API_KEY no configurada');
-            return res.status(500).json({ error: 'GEMINI_API_KEY is not configured in the server.' });
-        }
-        console.log(`[AI-Tickets] API Key detectada (longitud: ${apiKey.length})`);
-
-        const filePath = req.file.path;
-        const mimeType = getMimeType(filePath);
-        console.log(`[AI-Tickets] Procesando archivo: ${filePath} (Mime: ${mimeType})`);
-        
-        // 1. Convert image to Gemini part
+        // 1. Prepare Generative Part
         const imagePart = fileToGenerativePart(filePath, mimeType);
 
-        // 2. Define the schema for structured output (moved inside for freshness)
+        // 2. Define Response Schema
         const responseSchema = {
             type: Type.OBJECT,
             properties: {
@@ -105,51 +82,44 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
                             total_price: { type: Type.NUMBER },
                             category: { type: Type.STRING }
                         },
-                        required: ["product_name", "quantity", "total_price", "category"]
+                        required: ["product_name", "total_price"]
                     }
                 }
             },
             required: ["receipt_date", "supermarket", "total_amount", "items"]
         };
 
-        // 3. Call Gemini API - Using new API syntax
+        // 3. Call Gemini API
         const promptText = "Analyze this receipt image. Extract the date (YYYY-MM-DD), supermarket name, total amount, and a detailed list of items. Return as JSON.";
         
-        console.log('[AI-Tickets] Llamando a Gemini API (gemini-2.0-flash)...');
+        addLog('INFO', 'AI-Tickets', 'Llamando a Gemini (gemini-2.0-flash)...');
         
-        const result = await genAI.models.generateContent({
+        const model = genAI.getGenerativeModel({ 
             model: 'gemini-2.0-flash',
-            contents: [{ 
-                role: 'user', 
-                parts: [
-                    { text: promptText },
-                    imagePart
-                ] 
-            }],
-            config: {
+            generationConfig: {
                 responseMimeType: "application/json",
                 responseSchema: responseSchema,
             }
         });
 
-        const textResponse = result.text;
-        console.log('[AI-Tickets] Respuesta recibida de Gemini');
+        const result = await model.generateContent([
+            { text: promptText },
+            imagePart
+        ]);
+
+        const textResponse = result.response.text();
+        addLog('DEBUG', 'AI-Tickets', 'Respuesta recibida correctamente');
         
         let extractedData;
         try {
             extractedData = JSON.parse(textResponse);
         } catch (parseError) {
-            console.error('[AI-Tickets] Error al parsear JSON:', parseError.message);
-            console.error('[AI-Tickets] Raw Content:', textResponse);
-            return res.status(500).json({ 
-                error: 'AI returned invalid JSON', 
-                details: parseError.message,
-                raw: textResponse 
-            });
+            addLog('ERROR', 'AI-Tickets', `JSON Inválido: ${parseError.message}`);
+            return res.status(500).json({ error: 'AI returned invalid JSON', details: parseError.message });
         }
         
         // 4. Save to Database
-        console.log(`[AI-Tickets] Guardando ticket de ${extractedData.supermarket} en DB...`);
+        addLog('INFO', 'AI-Tickets', `Guardando ticket de ${extractedData.supermarket} - ${extractedData.total_amount}€`);
         const imageUrl = `/uploads/${path.basename(filePath)}`;
         
         const headerResult = db.prepare(`
@@ -163,7 +133,6 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
         );
         
         const receiptId = headerResult.lastInsertRowid;
-        console.log(`[AI-Tickets] Header guardado con ID: ${receiptId}`);
         
         // Insert Items
         if (extractedData.items && extractedData.items.length > 0) {
@@ -182,7 +151,7 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
                     item.category || 'Other'
                 );
             });
-            console.log(`[AI-Tickets] ${extractedData.items.length} productos guardados.`);
+            addLog('INFO', 'AI-Tickets', `${extractedData.items.length} productos guardados.`);
         }
         
         res.json({
@@ -193,7 +162,7 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
         });
 
     } catch (error) {
-        console.error('[AI-Tickets] ERROR CRÍTICO:', error);
+        addLog('ERROR', 'AI-Tickets', `Error en procesamiento: ${error.message}`);
         res.status(500).json({ 
             error: 'Failed to process receipt via AI', 
             details: error.message,
@@ -202,51 +171,46 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
     }
 });
 
-// ============================================================
-// EMAIL ALERTS ENDPOINTS
-// ============================================================
+/**
+ * EMAIL ALERTS ENDPOINTS
+ */
 
 // GET all email alerts
 router.get('/email-alerts', (req, res) => {
     try {
-        const alerts = db.prepare(
-            'SELECT * FROM email_alerts ORDER BY received_at DESC LIMIT 50'
-        ).all();
+        const alerts = db.prepare('SELECT * FROM email_alerts ORDER BY received_at DESC LIMIT 50').all();
         res.json(alerts);
     } catch (error) {
-        console.error('[EmailAlerts] Error fetching alerts:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
 
-// PUT mark alert as read
+// MARK as read
 router.put('/email-alerts/:id/read', (req, res) => {
     try {
-        const { id } = req.params;
-        db.prepare('UPDATE email_alerts SET status = ? WHERE id = ?').run('read', id);
-        res.json({ message: 'Alerta marcada como leída' });
+        db.prepare('UPDATE email_alerts SET status = "read" WHERE id = ?').run(req.params.id);
+        res.json({ success: true });
     } catch (error) {
-        console.error('[EmailAlerts] Error marking alert:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
 
-// POST trigger manual email check
+// TRIGGER check
 router.post('/trigger-email-check', async (req, res) => {
     try {
-        console.log('[EmailAlerts] Comprobación manual de emails iniciada...');
-        processUnreadEmails();
-        res.json({ message: 'Comprobación de emails iniciada en segundo plano' });
+        addLog('INFO', 'EmailAlerts', 'Comprobación manual iniciada');
+        processUnreadEmails(); // Async background
+        res.json({ message: 'Comprobación iniciada en segundo plano' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// GET endpoints for BI Dashboard
-router.get('/', (req, res) => {
+// System Logs Endpoint (Debug)
+router.get('/logs', (req, res) => {
     try {
-        const receipts = db.prepare('SELECT * FROM receipts ORDER BY date DESC').all();
-        res.json(receipts);
+        const logs = db.prepare('SELECT * FROM system_logs ORDER BY timestamp DESC LIMIT 100').all();
+        res.json(logs);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -255,9 +219,9 @@ router.get('/', (req, res) => {
 router.get('/items', (req, res) => {
     try {
         const items = db.prepare(`
-            SELECT ri.*, r.date, r.supermarket 
-            FROM receipt_items ri
-            JOIN receipts r ON ri.receipt_id = r.id
+            SELECT i.*, r.supermarket, r.date 
+            FROM receipt_items i
+            JOIN receipts r ON i.receipt_id = r.id
             ORDER BY r.date DESC
         `).all();
         res.json(items);
