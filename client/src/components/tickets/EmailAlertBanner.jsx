@@ -9,6 +9,8 @@ const EmailAlertBanner = ({ onUnreadCountChange }) => {
     const [loading, setLoading] = useState(true);
     const [checking, setChecking] = useState(false);
     const [error, setError] = useState(null);
+    const [showLogs, setShowLogs] = useState(false);
+    const [systemLogs, setSystemLogs] = useState([]);
 
     const fetchAlerts = useCallback(async () => {
         try {
@@ -53,6 +55,16 @@ const EmailAlertBanner = ({ onUnreadCountChange }) => {
         } catch (err) {
             console.error('[EmailAlerts] Error triggering check:', err);
             setChecking(false);
+        }
+    };
+
+    const fetchLogs = async () => {
+        try {
+            const res = await axios.get(`${API_URL}/bi/tickets/logs`);
+            setSystemLogs(res.data || []);
+            setShowLogs(true);
+        } catch (err) {
+            console.error('Error fetching logs:', err);
         }
     };
 
@@ -117,6 +129,41 @@ const EmailAlertBanner = ({ onUnreadCountChange }) => {
                     {checking ? 'Comprobando...' : 'Revisar ahora'}
                 </button>
             </div>
+
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                <button 
+                    onClick={() => setShowLogs(!showLogs)}
+                    style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                    {showLogs ? 'Ocultar Logs' : 'Ver Logs del Sistema'}
+                </button>
+                {showLogs && (
+                    <button 
+                        onClick={fetchLogs}
+                        style={{ fontSize: '11px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}
+                    >
+                        Actualizar Logs
+                    </button>
+                )}
+            </div>
+
+            {showLogs && (
+                <div style={{ 
+                    maxHeight: '200px', overflowY: 'auto', background: '#1e293b', 
+                    color: '#e2e8f0', padding: '12px', borderRadius: '8px', 
+                    fontSize: '11px', fontFamily: 'monospace', marginBottom: '16px' 
+                }}>
+                    {systemLogs.length === 0 ? 'Cargando logs...' : systemLogs.map(log => (
+                        <div key={log.id} style={{ marginBottom: '4px', borderBottom: '1px solid #334155', paddingBottom: '2px' }}>
+                            <span style={{ color: '#94a3b8' }}>[{new Date(log.timestamp).toLocaleTimeString()}]</span>{' '}
+                            <span style={{ color: log.level === 'ERROR' ? '#f87171' : (log.level === 'SUCCESS' ? '#4ade80' : '#818cf8') }}>
+                                [{log.level}]
+                            </span>{' '}
+                            <span style={{ fontWeight: 'bold' }}>[{log.context}]</span> {log.message}
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {error && (
                 <div style={{ color: '#ef4444', fontSize: '13px', marginBottom: '8px', padding: '8px 12px', background: '#fef2f2', borderRadius: '8px', border: '1px solid #fecaca' }}>
