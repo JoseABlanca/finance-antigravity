@@ -94,6 +94,9 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
         
         addLog('INFO', 'AI-Tickets', 'Llamando a Gemini (gemini-2.0-flash) con reintentos...');
         
+        // Initial delay to avoid rapid-fire requests hitting the quota
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
         let result;
         let attempts = 0;
         const maxAttempts = 5;
