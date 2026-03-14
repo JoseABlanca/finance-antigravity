@@ -130,14 +130,40 @@ async function processUnreadEmails() {
                 const modelName = 'gemini-2.0-flash';
                 addLog('DEBUG', 'EmailService', `Llamando a Gemini (${modelName})...`);
 
-                const result = await genAI.models.generateContent({
-                    model: modelName,
-                    contents: attachmentPart ? [{ text: promptText }, attachmentPart] : [{ text: promptText }],
-                    config: {
-                        responseMimeType: "application/json",
-                        responseSchema: responseSchema,
+                let result;
+                let attempts = 0;
+                const maxAttempts = 5;
+                
+                while (attempts < maxAttempts) {
+                    try {
+                        // Base delay of 3s + exponential wait based on attempts
+                        const baseWait = attempts === 0 ? 0 : Math.pow(2, attempts) * 2000 + Math.random() * 1000;
+                        if (baseWait > 0) {
+                            addLog('DEBUG', 'EmailService', `Esperando ${Math.round(baseWait/1000)}s antes de reintentar (Intento ${attempts + 1}/${maxAttempts})`);
+                            await new Promise(resolve => setTimeout(resolve, baseWait));
+                        }
+
+                        result = await genAI.models.generateContent({
+                            model: modelName,
+                            contents: attachmentPart ? [{ text: promptText }, attachmentPart] : [{ text: promptText }],
+                            config: {
+                                responseMimeType: "application/json",
+                                responseSchema: responseSchema,
+                            }
+                        });
+                        break; // Success
+                    } catch (error) {
+                        attempts++;
+                        const isQuotaError = error.message?.includes('429') || error.status === 429 || error.code === 429;
+                        
+                        if (isQuotaError && attempts < maxAttempts) {
+                            addLog('WARN', 'EmailService', `Cuota excedida (429) en Gemini. Reintentando...`);
+                            // Loop continues
+                        } else {
+                            throw error; // Rethrow if not a quota error or max attempts reached
+                        }
                     }
-                });
+                }
 
                 const data = JSON.parse(result.text);
 

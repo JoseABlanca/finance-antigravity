@@ -96,7 +96,7 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
         
         let result;
         let attempts = 0;
-        const maxAttempts = 3;
+        const maxAttempts = 5;
         
         while (attempts < maxAttempts) {
             try {
@@ -120,7 +120,7 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
                 const isQuotaError = error.message?.includes('429') || error.status === 429 || error.code === 429;
                 
                 if (isQuotaError && attempts < maxAttempts) {
-                    const waitTime = Math.pow(2, attempts) * 1000 + Math.random() * 1000;
+                    const waitTime = Math.pow(2, attempts) * 1500 + Math.random() * 1500;
                     addLog('WARN', 'AI-Tickets', `Cuota excedida (429). Reintentando en ${Math.round(waitTime/1000)}s... (Intento ${attempts}/${maxAttempts})`);
                     await new Promise(resolve => setTimeout(resolve, waitTime));
                 } else {
