@@ -7,6 +7,27 @@ const cron = require('node-cron');
 const db = require('./db');
 const { processUnreadEmails } = require('./services/emailReader');
 
+// Ensure email_alerts table exists (safe to run each startup)
+try {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS email_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            received_at TEXT NOT NULL,
+            sender TEXT,
+            subject TEXT,
+            vendor TEXT,
+            amount REAL DEFAULT 0,
+            is_expense INTEGER DEFAULT 1,
+            journal_entry_id INTEGER,
+            status TEXT DEFAULT 'unread',
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    `);
+    console.log('[DB] Tabla email_alerts verificada/creada.');
+} catch (e) {
+    console.error('[DB] Error creando tabla email_alerts:', e.message);
+}
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 

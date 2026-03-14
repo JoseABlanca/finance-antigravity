@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { GoogleGenAI, Type } = require('@google/genai');
+const { processUnreadEmails } = require('../services/emailReader');
 const db = require('../db');
 
 // Setup multer for image uploads
@@ -22,8 +23,8 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// Initialize Gemini API - Simpler and more standard initialization
-const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY);
+// Initialize Gemini API - corrected initialization with object param
+const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // Utility to convert local file to Gemini API part format
 function fileToGenerativePart(filePath, mimeType) {
@@ -111,13 +112,13 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
             required: ["receipt_date", "supermarket", "total_amount", "items"]
         };
 
-        // 3. Call Gemini API - Using more robust structure
+        // 3. Call Gemini API - Using new API syntax
         const promptText = "Analyze this receipt image. Extract the date (YYYY-MM-DD), supermarket name, total amount, and a detailed list of items. Return as JSON.";
         
-        console.log('[AI-Tickets] Llamando a Gemini API (gemini-1.5-flash)...');
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        console.log('[AI-Tickets] Llamando a Gemini API (gemini-2.0-flash)...');
         
-        const result = await model.generateContent({
+        const result = await genAI.models.generateContent({
+            model: 'gemini-2.0-flash',
             contents: [{ 
                 role: 'user', 
                 parts: [
@@ -125,14 +126,13 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
                     imagePart
                 ] 
             }],
-            generationConfig: {
+            config: {
                 responseMimeType: "application/json",
-                // schema is optional but helpful if supported
                 responseSchema: responseSchema,
             }
         });
 
-        const textResponse = result.response.text();
+        const textResponse = result.text;
         console.log('[AI-Tickets] Respuesta recibida de Gemini');
         
         let extractedData;
@@ -199,6 +199,46 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
             details: error.message,
             code: error.status || error.code || 'UNKNOWN_ERROR'
         });
+    }
+});
+
+// ============================================================
+// EMAIL ALERTS ENDPOINTS
+// ============================================================
+
+// GET all email alerts
+router.get('/email-alerts', (req, res) => {
+    try {
+        const alerts = db.prepare(
+            'SELECT * FROM email_alerts ORDER BY received_at DESC LIMIT 50'
+        ).all();
+        res.json(alerts);
+    } catch (error) {
+        console.error('[EmailAlerts] Error fetching alerts:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PUT mark alert as read
+router.put('/email-alerts/:id/read', (req, res) => {
+    try {
+        const { id } = req.params;
+        db.prepare('UPDATE email_alerts SET status = ? WHERE id = ?').run('read', id);
+        res.json({ message: 'Alerta marcada como leída' });
+    } catch (error) {
+        console.error('[EmailAlerts] Error marking alert:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST trigger manual email check
+router.post('/trigger-email-check', async (req, res) => {
+    try {
+        console.log('[EmailAlerts] Comprobación manual de emails iniciada...');
+        processUnreadEmails();
+        res.json({ message: 'Comprobación de emails iniciada en segundo plano' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 

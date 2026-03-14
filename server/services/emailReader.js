@@ -3,6 +3,7 @@ const simpleParser = require('mailparser').simpleParser;
 const { GoogleGenAI, Type } = require('@google/genai');
 const db = require('../db');
 
+// Corrected initialization: pass object with apiKey, not just the string
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 async function getSettings() {
@@ -101,42 +102,81 @@ async function processUnreadEmails() {
                     required: ["is_invoice_or_receipt", "date", "amount", "concept", "is_expense", "vendor"]
                 };
 
-                const prompt = `Analiza este correo:
+                const promptText = `Analiza este correo y determina si es una factura o justificante de pago:
                 Subject: ${parsedMail.subject}
                 Body: ${emailText}`;
 
-                const contents = [prompt];
-                if (imagePart) contents.push(imagePart);
+                const contents = [{ role: 'user', parts: [{ text: promptText }] }];
+                if (imagePart) {
+                    contents[0].parts.push(imagePart);
+                }
 
-                const response = await ai.getGenerativeModel({ model: 'gemini-1.5-flash' }).generateContent({
+                // Use new API syntax: genAI.models.generateContent
+                const response = await ai.models.generateContent({
+                    model: 'gemini-2.0-flash',
                     contents: contents,
-                    generationConfig: {
+                    config: {
                         responseMimeType: "application/json",
                         responseSchema: responseSchema,
                     }
                 });
 
-                const data = JSON.parse(response.response.text());
+                const data = JSON.parse(response.text);
+                
+                const senderAddress = parsedMail.from?.value?.[0]?.address || parsedMail.from?.text || 'Desconocido';
+                const receivedAt = parsedMail.date ? parsedMail.date.toISOString() : new Date().toISOString();
 
-                if (data.is_invoice_or_receipt && data.amount > 0) {
-                    const conceptHeader = `Auto: ${data.vendor} - ${data.concept}`;
-                    const MAIN_BANK_ACCOUNT = 1;
-                    const EXPENSE_ACCOUNT = 33;
-                    const INCOME_ACCOUNT = 34;
+                if (data.is_invoice_or_receipt) {
+                    console.log(`[EmailService] Factura/justificante detectado: ${data.vendor} - ${data.amount}€`);
+                    
+                    let journalEntryId = null;
 
-                    const entryResult = db.prepare(`INSERT INTO journal_entries (date, comment) VALUES (?, ?)`).run(data.date, conceptHeader);
-                    const entryId = entryResult.lastInsertRowid;
-                    const insertLine = db.prepare(`INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`);
+                    // Only create accounting entry if amount > 0
+                    if (data.amount > 0) {
+                        const conceptHeader = `Auto: ${data.vendor} - ${data.concept}`;
+                        const MAIN_BANK_ACCOUNT = 1;
+                        const EXPENSE_ACCOUNT = 33;
+                        const INCOME_ACCOUNT = 34;
 
-                    if (data.is_expense) {
-                        insertLine.run(entryId, EXPENSE_ACCOUNT, data.amount, 0);
-                        insertLine.run(entryId, MAIN_BANK_ACCOUNT, 0, data.amount);
-                    } else {
-                        insertLine.run(entryId, MAIN_BANK_ACCOUNT, data.amount, 0);
-                        insertLine.run(entryId, INCOME_ACCOUNT, 0, data.amount);
+                        try {
+                            const entryResult = db.prepare(`INSERT INTO journal_entries (date, comment) VALUES (?, ?)`).run(data.date, conceptHeader);
+                            journalEntryId = entryResult.lastInsertRowid;
+                            const insertLine = db.prepare(`INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`);
+
+                            if (data.is_expense) {
+                                insertLine.run(journalEntryId, EXPENSE_ACCOUNT, data.amount, 0);
+                                insertLine.run(journalEntryId, MAIN_BANK_ACCOUNT, 0, data.amount);
+                            } else {
+                                insertLine.run(journalEntryId, MAIN_BANK_ACCOUNT, data.amount, 0);
+                                insertLine.run(journalEntryId, INCOME_ACCOUNT, 0, data.amount);
+                            }
+                            console.log(`[EmailService] Asiento Contable #${journalEntryId} creado.`);
+                        } catch (dbErr) {
+                            console.error('[EmailService] Error creating journal entry:', dbErr.message);
+                        }
                     }
-                    console.log(`[EmailService] Asiento Contable #${entryId} creado.`);
+
+                    // Save alert to email_alerts table
+                    try {
+                        db.prepare(`
+                            INSERT INTO email_alerts (received_at, sender, subject, vendor, amount, is_expense, journal_entry_id, status)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, 'unread')
+                        `).run(
+                            receivedAt,
+                            senderAddress,
+                            parsedMail.subject || '(Sin asunto)',
+                            data.vendor || 'Desconocido',
+                            data.amount || 0,
+                            data.is_expense ? 1 : 0,
+                            journalEntryId
+                        );
+                        console.log(`[EmailService] Alerta guardada para: ${senderAddress}`);
+                    } catch (alertErr) {
+                        console.error('[EmailService] Error saving alert (tabla puede no existir aún):', alertErr.message);
+                    }
                 }
+                
+                // Mark email as seen in IMAP
                 await connection.addFlags(id, ['\\Seen']);
 
             } catch (err) {
