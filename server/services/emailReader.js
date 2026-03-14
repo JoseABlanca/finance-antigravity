@@ -79,6 +79,12 @@ async function processUnreadEmails() {
                 const existing = db.prepare('SELECT id FROM email_alerts WHERE sender = ? AND subject = ? AND received_at = ?').get(senderAddress, subject, receivedAt);
                 if (existing) continue;
 
+                // FILTER: Only process emails with "Factura" in subject (as requested)
+                if (!subject.toLowerCase().includes('factura')) {
+                    addLog('DEBUG', 'EmailService', `Saltando: "${subject}" (No incluye "Factura")`);
+                    continue;
+                }
+
                 addLog('DEBUG', 'EmailService', `Procesando: "${subject}" de ${senderAddress}`);
                 
                 let emailText = parsedMail.text || parsedMail.textAsHtml || '';
@@ -99,6 +105,9 @@ async function processUnreadEmails() {
                     }
                 }
 
+                // RATE LIMITING: Wait 2 seconds before calling Gemini to respect free tier quota (15 RPM)
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
                 const responseSchema = {
                     type: Type.OBJECT,
                     properties: {
@@ -107,12 +116,14 @@ async function processUnreadEmails() {
                         amount: { type: Type.NUMBER },
                         concept: { type: Type.STRING },
                         is_expense: { type: Type.BOOLEAN },
-                        vendor: { type: Type.STRING }
+                        vendor: { type: Type.STRING },
+                        bank_name: { type: Type.STRING, enum: ["BBVA", "Sabadell", "TradeRepublic", "Unknown"] }
                     },
-                    required: ["is_invoice_or_receipt", "date", "amount", "concept", "is_expense", "vendor"]
+                    required: ["is_invoice_or_receipt", "date", "amount", "concept", "is_expense", "vendor", "bank_name"]
                 };
 
                 const promptText = `Analiza este correo y cualquier adjunto para determinar si es una factura o justificante de pago.
+                Identifica también si se menciona algún banco emisor del pago entre: BBVA, Sabadell o TradeRepublic.
                 Subject: ${subject}
                 Body: ${emailText}`;
 
@@ -121,7 +132,7 @@ async function processUnreadEmails() {
 
                 const result = await genAI.models.generateContent({
                     model: modelName,
-                    contents: contents,
+                    contents: attachmentPart ? [{ text: promptText }, attachmentPart] : [{ text: promptText }],
                     config: {
                         responseMimeType: "application/json",
                         responseSchema: responseSchema,
@@ -131,38 +142,43 @@ async function processUnreadEmails() {
                 const data = JSON.parse(result.text);
 
                 if (data.is_invoice_or_receipt) {
-                    addLog('INFO', 'EmailService', `Factura detectada: ${data.vendor} - ${data.amount}€`);
+                    addLog('INFO', 'EmailService', `Factura detectada: ${data.vendor} - ${data.amount}€ (Banco: ${data.bank_name})`);
                     
                     let journalEntryId = null;
-                    // Try to create accounting entry if amount > 0
                     if (data.amount && data.amount > 0) {
                         try {
                             const entryDate = data.date || new Date().toISOString().split('T')[0];
-                            const entryComment = `Auto: ${data.vendor || 'Unknown'} - ${data.concept || 'Factura email'}`;
+                            const entryComment = `Auto Email: ${data.vendor || 'Unknown'} - ${data.concept || 'Factura mail'}`;
                             
                             const entryResult = db.prepare(`INSERT INTO journal_entries (date, comment) VALUES (?, ?)`).run(entryDate, entryComment);
                             journalEntryId = entryResult.lastInsertRowid;
                             
                             const insertLine = db.prepare(`INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`);
                             
-                            // DEFAULT ACCOUNTS: 1=Bancos, 33=Gastos Generales, 34=Ingresos por Servicios
-                            const MAIN_BANK = 1;
-                            const EXPENSE_ACC = 33;
-                            const INCOME_ACC = 34;
+                            // Bank Mapping
+                            const BANK_IDS = {
+                                "BBVA": 100,
+                                "TradeRepublic": 101,
+                                "Sabadell": 102,
+                                "Unknown": 100 // Default to BBVA if unknown
+                            };
+                            const bankAccountId = BANK_IDS[data.bank_name] || 100;
+                            const EXPENSE_ACC = 104; // Compras de mercaderías
+                            const INCOME_ACC = 34; // Ingresos por Servicios (fallback)
 
                             if (data.is_expense) {
+                                // Gasto: Debe Mercaderías (104), Haber Banco
                                 insertLine.run(journalEntryId, EXPENSE_ACC, data.amount, 0);
-                                insertLine.run(journalEntryId, MAIN_BANK, 0, data.amount);
+                                insertLine.run(journalEntryId, bankAccountId, 0, data.amount);
                             } else {
-                                insertLine.run(journalEntryId, MAIN_BANK, data.amount, 0);
+                                // Ingreso: Debe Banco, Haber Ingresos
+                                insertLine.run(journalEntryId, bankAccountId, data.amount, 0);
                                 insertLine.run(journalEntryId, INCOME_ACC, 0, data.amount);
                             }
-                            addLog('SUCCESS', 'EmailService', `Asiento contable creado con ID ${journalEntryId}`);
+                            addLog('SUCCESS', 'EmailService', `Asiento contable ID ${journalEntryId} creado (${data.bank_name} -> ${EXPENSE_ACC})`);
                         } catch (dbErr) {
-                            addLog('ERROR', 'EmailService', `Error creando asiento contable: ${dbErr.message}`);
+                            addLog('ERROR', 'EmailService', `Error creando asiento: ${dbErr.message}`);
                         }
-                    } else {
-                        addLog('WARN', 'EmailService', `No se creó asiento (importe: ${data.amount})`);
                     }
 
                     db.prepare(`

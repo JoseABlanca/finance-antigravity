@@ -89,28 +89,48 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
             required: ["receipt_date", "supermarket", "total_amount", "items"]
         };
 
-        // 3. Call Gemini API
+        // 3. Call Gemini API with Retry Logic for 429 errors
         const promptText = "Analyze this receipt image. Extract the date (YYYY-MM-DD), supermarket name, total amount, and a detailed list of items. Return as JSON.";
         
-        addLog('INFO', 'AI-Tickets', 'Llamando a Gemini (gemini-2.0-flash)...');
+        addLog('INFO', 'AI-Tickets', 'Llamando a Gemini (gemini-2.0-flash) con reintentos...');
         
-        const result = await genAI.models.generateContent({
-            model: 'gemini-2.0-flash',
-                contents: [{ 
-                    role: 'user', 
-                    parts: [
-                        { text: promptText },
-                        imagePart
-                    ] 
-                }],
-                config: {
-                    responseMimeType: "application/json",
-                    responseSchema: responseSchema,
+        let result;
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        while (attempts < maxAttempts) {
+            try {
+                result = await genAI.models.generateContent({
+                    model: 'gemini-2.0-flash',
+                    contents: [{ 
+                        role: 'user', 
+                        parts: [
+                            { text: promptText },
+                            imagePart
+                        ] 
+                    }],
+                    config: {
+                        responseMimeType: "application/json",
+                        responseSchema: responseSchema,
+                    }
+                });
+                break; // Success
+            } catch (error) {
+                attempts++;
+                const isQuotaError = error.message?.includes('429') || error.status === 429 || error.code === 429;
+                
+                if (isQuotaError && attempts < maxAttempts) {
+                    const waitTime = Math.pow(2, attempts) * 1000 + Math.random() * 1000;
+                    addLog('WARN', 'AI-Tickets', `Cuota excedida (429). Reintentando en ${Math.round(waitTime/1000)}s... (Intento ${attempts}/${maxAttempts})`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                } else {
+                    throw error; // Rethrow if not a quota error or max attempts reached
                 }
-            });
+            }
+        }
 
-            const textResponse = result.text;
-            addLog('DEBUG', 'AI-Tickets', 'Respuesta recibida correctamente');
+        const textResponse = result.text;
+        addLog('DEBUG', 'AI-Tickets', 'Respuesta recibida correctamente');
             
             let extractedData;
             try {
