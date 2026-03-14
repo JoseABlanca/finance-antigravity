@@ -52,8 +52,10 @@ async function processUnreadEmails() {
         connection = await imaps.connect(config);
         await connection.openBox('INBOX');
 
-        // Search for UNREAD emails
-        const searchCriteria = ['UNREAD'];
+        // Search emails from last 2 days (not just UNSEEN, so we catch emails opened in Gmail)
+        const sinceDate = new Date();
+        sinceDate.setDate(sinceDate.getDate() - 2);
+        const searchCriteria = [['SINCE', sinceDate]];
         const fetchOptions = {
             bodies: ['HEADER', 'TEXT', ''],
             markSeen: false,
@@ -61,7 +63,7 @@ async function processUnreadEmails() {
         };
 
         const messages = await connection.search(searchCriteria, fetchOptions);
-        console.log(`[EmailService] Encontrados ${messages.length} correos no leídos.`);
+        console.log(`[EmailService] Encontrados ${messages.length} correos en los últimos 2 días.`);
 
         for (const item of messages) {
             const all = item.parts.find(p => p.which === '');
@@ -70,7 +72,18 @@ async function processUnreadEmails() {
             
             try {
                 const parsedMail = await simpleParser(idHeader + all.body);
-                console.log(`[EmailService] Procesando correo UID ${id}: "${parsedMail.subject}"`);
+                const senderAddress = parsedMail.from?.value?.[0]?.address || parsedMail.from?.text || 'Desconocido';
+                const receivedAt = parsedMail.date ? parsedMail.date.toISOString() : new Date().toISOString();
+                const subject = parsedMail.subject || '(Sin asunto)';
+
+                // DEDUPLICATION: Check if this email was already processed
+                const existing = db.prepare('SELECT id FROM email_alerts WHERE sender = ? AND subject = ? AND received_at = ?').get(senderAddress, subject, receivedAt);
+                if (existing) {
+                    console.log(`[EmailService] Saltando correo UID ${id}: Ya procesado previamente (ID Alerta: ${existing.id})`);
+                    continue;
+                }
+
+                console.log(`[EmailService] Procesando correo UID ${id}: "${subject}"`);
                 
                 let emailText = parsedMail.text || parsedMail.textAsHtml || '';
                 if (emailText.length > 3000) emailText = emailText.substring(0, 3000);
@@ -122,9 +135,6 @@ async function processUnreadEmails() {
                 });
 
                 const data = JSON.parse(response.text);
-                
-                const senderAddress = parsedMail.from?.value?.[0]?.address || parsedMail.from?.text || 'Desconocido';
-                const receivedAt = parsedMail.date ? parsedMail.date.toISOString() : new Date().toISOString();
 
                 if (data.is_invoice_or_receipt) {
                     console.log(`[EmailService] Factura/justificante detectado: ${data.vendor} - ${data.amount}€`);
@@ -164,7 +174,7 @@ async function processUnreadEmails() {
                         `).run(
                             receivedAt,
                             senderAddress,
-                            parsedMail.subject || '(Sin asunto)',
+                            subject,
                             data.vendor || 'Desconocido',
                             data.amount || 0,
                             data.is_expense ? 1 : 0,

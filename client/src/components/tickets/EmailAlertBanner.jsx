@@ -49,7 +49,7 @@ const EmailAlertBanner = ({ onUnreadCountChange }) => {
             setTimeout(() => {
                 fetchAlerts();
                 setChecking(false);
-            }, 3000);
+            }, 20000); // 20 seconds
         } catch (err) {
             console.error('[EmailAlerts] Error triggering check:', err);
             setChecking(false);
