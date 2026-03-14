@@ -116,40 +116,53 @@ async function processUnreadEmails() {
                 Subject: ${subject}
                 Body: ${emailText}`;
 
-                const model = genAI.getGenerativeModel({ 
-                    model: 'gemini-2.0-flash',
-                    generationConfig: {
+                const modelName = 'gemini-2.0-flash';
+                addLog('DEBUG', 'EmailService', `Llamando a Gemini (${modelName})...`);
+
+                const result = await genAI.models.generateContent({
+                    model: modelName,
+                    contents: contents,
+                    config: {
                         responseMimeType: "application/json",
                         responseSchema: responseSchema,
                     }
                 });
 
-                const contents = [ { text: promptText } ];
-                if (attachmentPart) contents.push(attachmentPart);
-
-                const result = await model.generateContent(contents);
-                const data = JSON.parse(result.response.text());
+                const data = JSON.parse(result.text);
 
                 if (data.is_invoice_or_receipt) {
                     addLog('INFO', 'EmailService', `Factura detectada: ${data.vendor} - ${data.amount}€`);
                     
                     let journalEntryId = null;
-                    if (data.amount > 0) {
+                    // Try to create accounting entry if amount > 0
+                    if (data.amount && data.amount > 0) {
                         try {
-                            const entryResult = db.prepare(`INSERT INTO journal_entries (date, comment) VALUES (?, ?)`).run(data.date, `Auto: ${data.vendor} - ${data.concept}`);
+                            const entryDate = data.date || new Date().toISOString().split('T')[0];
+                            const entryComment = `Auto: ${data.vendor || 'Unknown'} - ${data.concept || 'Factura email'}`;
+                            
+                            const entryResult = db.prepare(`INSERT INTO journal_entries (date, comment) VALUES (?, ?)`).run(entryDate, entryComment);
                             journalEntryId = entryResult.lastInsertRowid;
+                            
                             const insertLine = db.prepare(`INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`);
+                            
+                            // DEFAULT ACCOUNTS: 1=Bancos, 33=Gastos Generales, 34=Ingresos por Servicios
                             const MAIN_BANK = 1;
+                            const EXPENSE_ACC = 33;
+                            const INCOME_ACC = 34;
+
                             if (data.is_expense) {
-                                insertLine.run(journalEntryId, 33, data.amount, 0);
+                                insertLine.run(journalEntryId, EXPENSE_ACC, data.amount, 0);
                                 insertLine.run(journalEntryId, MAIN_BANK, 0, data.amount);
                             } else {
                                 insertLine.run(journalEntryId, MAIN_BANK, data.amount, 0);
-                                insertLine.run(journalEntryId, 34, 0, data.amount);
+                                insertLine.run(journalEntryId, INCOME_ACC, 0, data.amount);
                             }
+                            addLog('SUCCESS', 'EmailService', `Asiento contable creado con ID ${journalEntryId}`);
                         } catch (dbErr) {
-                            addLog('ERROR', 'EmailService', `Error DB: ${dbErr.message}`);
+                            addLog('ERROR', 'EmailService', `Error creando asiento contable: ${dbErr.message}`);
                         }
+                    } else {
+                        addLog('WARN', 'EmailService', `No se creó asiento (importe: ${data.amount})`);
                     }
 
                     db.prepare(`

@@ -94,29 +94,31 @@ router.post('/upload', upload.single('receipt'), async (req, res) => {
         
         addLog('INFO', 'AI-Tickets', 'Llamando a Gemini (gemini-2.0-flash)...');
         
-        const model = genAI.getGenerativeModel({ 
+        const result = await genAI.models.generateContent({
             model: 'gemini-2.0-flash',
-            generationConfig: {
-                responseMimeType: "application/json",
-                responseSchema: responseSchema,
+                contents: [{ 
+                    role: 'user', 
+                    parts: [
+                        { text: promptText },
+                        imagePart
+                    ] 
+                }],
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: responseSchema,
+                }
+            });
+
+            const textResponse = result.text;
+            addLog('DEBUG', 'AI-Tickets', 'Respuesta recibida correctamente');
+            
+            let extractedData;
+            try {
+                extractedData = JSON.parse(textResponse);
+            } catch (parseError) {
+                addLog('ERROR', 'AI-Tickets', `JSON Inválido: ${parseError.message}`);
+                return res.status(500).json({ error: 'AI returned invalid JSON', details: parseError.message });
             }
-        });
-
-        const result = await model.generateContent([
-            { text: promptText },
-            imagePart
-        ]);
-
-        const textResponse = result.response.text();
-        addLog('DEBUG', 'AI-Tickets', 'Respuesta recibida correctamente');
-        
-        let extractedData;
-        try {
-            extractedData = JSON.parse(textResponse);
-        } catch (parseError) {
-            addLog('ERROR', 'AI-Tickets', `JSON Inválido: ${parseError.message}`);
-            return res.status(500).json({ error: 'AI returned invalid JSON', details: parseError.message });
-        }
         
         // 4. Save to Database
         addLog('INFO', 'AI-Tickets', `Guardando ticket de ${extractedData.supermarket} - ${extractedData.total_amount}€`);
